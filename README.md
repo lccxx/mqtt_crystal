@@ -10,6 +10,7 @@ Add this to your application's `shard.yml`:
 dependencies:
   mqtt_crystal:
     github: liu-chong/mqtt_crystal
+    branch: master
 ```
 
 ## Usage
