@@ -68,28 +68,23 @@ describe MqttCrystal do
     client.connect("172.17.0.1")
       .should be_a MqttCrystal::Packet::Connack
 
+    client.ping.should be_a MqttCrystal::Packet::Pingresp
+
     topic = "pub/#{client.id}/test"
     message = rand.to_s
 
     client.subscribe(topic)
-      .should be_a MqttCrystal::Packet::Suback
+      .should be_a MqttCrystal::Packet::Suback 
 
-    spawn {
-      client.get { |t, m|
-        t.should eq topic
-        t.should eq message
-      }
+    9.times {
+      client.publish(topic, message)
+      packet = client.read_packet
+      packet.should be_a MqttCrystal::Packet::Publish
+      packet = packet.as(MqttCrystal::Packet::Publish)
+      packet.topic.should eq topic
+      packet.payload.should eq message
     }
 
-    client.publish(topic, message)
-    packet = client.read_packet
-    packet.should be_a MqttCrystal::Packet::Publish
-    packet = packet.as(MqttCrystal::Packet::Publish)
-    packet.topic.should eq topic
-    packet.payload.should eq message
-
-    spawn {
-      client.keep_alive
-    }
+    spawn { client.keep_alive }
   end
 end

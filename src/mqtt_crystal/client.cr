@@ -47,9 +47,14 @@ class MqttCrystal::Client
     send MqttCrystal::Packet::Publish.new(topic: topic, payload: message)
   end
 
+  def ping
+    send MqttCrystal::Packet::Pingreq.new
+    read_packet
+  end
+
   def keep_alive
     while !stop
-      send MqttCrystal::Packet::Pingreq.new
+      ping
       sleep 15.seconds
     end
   end
@@ -83,7 +88,7 @@ class MqttCrystal::Client
     packet = nil
     while !stop
       packet = Packet.create_from_header(read_byte)
-      break if packet
+      break if packet && packet.validate_flags
       sleep 0.01
     end
     packet = packet || Packet::Pingresp.new
@@ -104,6 +109,13 @@ class MqttCrystal::Client
     slice = Bytes.new(body_length)
     socket.read slice
     packet.not_nil!.parse_body(slice)
+
+    if (packet.not_nil!.is_a?(Packet::Publish))
+      packet = packet.not_nil!.as(Packet::Publish)
+      if packet.qos > 0
+        send MqttCrystal::Packet::Puback.new(id: packet.id)
+      end
+    end
 
     packet.not_nil!
   end

@@ -15,6 +15,10 @@ class MqttCrystal::Packet
   def initialize(@flags : Array(Bool) = [ false, false, false, false ],
                  @body_length : UInt64 = 0_u64); end
 
+  def validate_flags
+    return flags == [ false, false, false, false ]
+  end
+
   def type_id : Int32
     PACKET_TYPES.index(self.class).not_nil!
   end
@@ -104,14 +108,28 @@ class MqttCrystal::Packet
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64); end
 
+    def qos
+      (@flags[1] ? 0x01 : 0x00) | (@flags[2] ? 0x02 : 0x00)
+    end
+
     def encode_body
       concatenate(encode_string(@topic), @payload.bytes)
     end
 
     def parse_body(buffer : Bytes)
+      return if buffer.size < 7
       len = (buffer[0] << 8) + buffer[1]
+      len = buffer.size - 2 if qos.zero? && len > buffer.size - 2
+      len = buffer.size - 4 if !qos.zero? && len > buffer.size - 4
       @topic = String.new(buffer[2, len])
-      @payload = String.new(buffer[len + 2, buffer.size - (len + 2)])
+      payload_start = len + 2
+      payload_size = buffer.size - (len + 2)
+      unless qos.zero?
+        @id = (buffer[payload_start].to_u16 << 8) + buffer[payload_start + 1]
+        payload_start += 2
+        payload_size -= 2
+      end
+      @payload = String.new(buffer[payload_start, payload_size])
     end
   end
 
@@ -171,7 +189,9 @@ class MqttCrystal::Packet
   end
 
   class Pubrel < MqttCrystal::Packet
-
+    def validate_flags
+      return flags == [ false, true, false, false ]
+    end
   end
 
   class Pubcomp < MqttCrystal::Packet
@@ -184,6 +204,10 @@ class MqttCrystal::Packet
                    @flags : Array(Bool) = [ false, true, false, false ],
                    @body_length : UInt64 = 0_u64); end
 
+    def validate_flags
+      return flags == [ false, true, false, false ]
+    end
+
     def encode_body : Bytes
       concatenate(encode_short(@id), encode_string(@topic), [ 0_u8 ])
     end
@@ -194,7 +218,9 @@ class MqttCrystal::Packet
   end
 
   class Unsubscribe < MqttCrystal::Packet
-
+    def validate_flags
+      return flags == [ false, true, false, false ]
+    end
   end
 
   class Unsuback < MqttCrystal::Packet
