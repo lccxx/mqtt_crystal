@@ -1,6 +1,6 @@
 # mqtt_crystal
 
-TODO: Write a description here
+pure crystal mqtt client
 
 ## Installation
 
@@ -9,20 +9,42 @@ Add this to your application's `shard.yml`:
 ```yaml
 dependencies:
   mqtt_crystal:
-    github: [your-github-name]/mqtt_crystal
+    github: liu-chong/mqtt_crystal
 ```
 
 ## Usage
 
 ```crystal
 require "mqtt_crystal"
+
+client = MqttCrystal::Client.new(id: "test1")
+
+client.connect("172.17.0.1", 1883, "liuchong", "passwordxxxx")
+
+client.subscribe("pub/test1")
+
+spawn {
+  client.get { |t, m|
+    pp t, m
+  }
+}
+
+spawn {
+  client.keep_alive
+}
+
+client.publish("pub/test1", "test payload xxxxyyyyyy")
 ```
 
-TODO: Write usage instructions here
+new -> connect -> subscribe -> get -> publish
 
 ## Development
 
-TODO: Write development instructions here
+git clone https://github.com/liu-chong/mqtt_crystal.git
+
+cd mqtt_crystal
+
+crystal spec
 
 ## Contributing
 
@@ -34,4 +56,4 @@ TODO: Write development instructions here
 
 ## Contributors
 
-- [[your-github-name]](https://github.com/[your-github-name]) Liu Chong - creator, maintainer
+- [[liu-chong]](https://github.com/liu-chong) Liu Chong - creator, maintainer
