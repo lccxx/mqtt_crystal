@@ -10,6 +10,7 @@ Add this to your application's `shard.yml`:
 dependencies:
   mqtt_crystal:
     github: liu-chong/mqtt_crystal
+    branch: master
 ```
 
 ## Usage
@@ -19,7 +20,7 @@ require "mqtt_crystal"
 
 client = MqttCrystal::Client.new(id: "test1")
 
-client.connect("172.17.0.1", 1883, "liuchong", "passwordxxxx")
+client.connect("172.17.0.1", 1883_u16, "liuchong", "passwordxxxx")
 
 client.subscribe("pub/test1")
 
