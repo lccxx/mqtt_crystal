@@ -1,6 +1,4 @@
 class MqttCrystal::Packet
-  ATTR_DEFAULTS = { version: "3.1.0", id: 0, body_length: 0_u64 }
-
   property flags, body_length
 
   def self.create_from_header(byte : UInt8)
@@ -97,13 +95,23 @@ class MqttCrystal::Packet
   end
 
   class Publish < MqttCrystal::Packet
+    property id, topic, payload, qos
+
     def initialize(@topic : String = "pub/test",
                    @payload : String = "test",
+                   @id : UInt16 = 0_u16,
+                   @qos : UInt8 = 0_u8,
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64); end
 
-    def bytes
-      slice_it "0\x0E\x00\b#{@topic}#{@payload}".bytes
+    def encode_body
+      concatenate(encode_string(@topic), @payload.bytes)
+    end
+
+    def parse_body(buffer : Bytes)
+      len = (buffer[0] << 8) + buffer[1]
+      @topic = String.new(buffer[2, len])
+      @payload = String.new(buffer[len + 2, buffer.size - (len + 2)])
     end
   end
 

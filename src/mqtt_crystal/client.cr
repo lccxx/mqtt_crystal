@@ -4,39 +4,42 @@ require "socket"
 class MqttCrystal::Client
   property socket, id, next_packet_id, stop
 
-  def initialize(@socket : IO,
+  def initialize(@socket : IO = IO::Memory.new,
                  @id : String = "S-#{UUID.random.to_s}",
                  @next_packet_id : UInt16 = 0_u16,
                  @stop : Bool = false); end
 
-  def connect(username : String | Nil = nil, password : String | Nil = nil)
+  def connect(host : String = "127.0.0.1",
+              port : UInt16 = 1883_u16,
+              username : String | Nil = nil,
+              password : String | Nil = nil)
+    @socket = TCPSocket.new(host, port)
     send MqttCrystal::Packet::Connect.new(client_id: @id, username: username, password: password)
     read_packet
   end
 
-  def subscribe(topic : String)
+  def subscribe(topic : String = "pub/#")
     send MqttCrystal::Packet::Subscribe.new(next_packet_id, topic)
     read_packet
   end
 
-  def connected?; !@socket.nil? && !@socket.not_nil!.closed? end
-
-  def get(topic : String = "pub/#")
-    send MqttCrystal::Packet::Subscribe.new(next_packet_id, topic)
-
+  def get
     while !stop
+      topic = payload = nil
       begin
         raise "socket not connected" if !connected?
-        packet = MqttCrystal::Packet.read(@socket.not_nil!)
-        next sleep 0.01 if packet.nil?
-        packet
+        packet = read_packet
+        if packet.is_a?(Packet::Publish)
+          topic = packet.topic
+          payload = packet.payload
+        end
       rescue e
         puts "handle packet failed: #{e}, reconnect"
         sleep 1.second
-        connect
+        connect if !stop
       end
 
-      yield topic, "m" if false
+      yield topic, payload if topic && payload
     end
   end
 
@@ -50,6 +53,8 @@ class MqttCrystal::Client
       sleep 15.seconds
     end
   end
+
+  def connected?; !@socket.nil? && !@socket.not_nil!.closed? end
 
   def send(packet : MqttCrystal::Packet)
     return if stop

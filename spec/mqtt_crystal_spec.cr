@@ -63,20 +63,33 @@ describe MqttCrystal do
   end
 
   it "works" do
-    TCPSocket.open("172.17.0.1", 1883) { |socket|
-      client = MqttCrystal::Client.new(socket, id: "CR-#{UUID.random.to_s}")
+    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}")
 
-      spawn { sleep 3; client.close }
+    client.connect("172.17.0.1")
+      .should be_a MqttCrystal::Packet::Connack
 
-      client.connect.should be_a MqttCrystal::Packet::Connack
+    topic = "pub/#{client.id}/test"
+    message = rand.to_s
 
-      topic = "pub/#{client.id}/test"
-      message = rand.to_s
+    client.subscribe(topic)
+      .should be_a MqttCrystal::Packet::Suback
 
-      client.subscribe(topic).should be_a MqttCrystal::Packet::Suback
+    spawn {
+      client.get { |t, m|
+        t.should eq topic
+        t.should eq message
+      }
+    }
 
-      # client.publish(topic, message)
-      # client.read_packet.should be_a MqttCrystal::Packet::Publish
+    client.publish(topic, message)
+    packet = client.read_packet
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet = packet.as(MqttCrystal::Packet::Publish)
+    packet.topic.should eq topic
+    packet.payload.should eq message
+
+    spawn {
+      client.keep_alive
     }
   end
 end
