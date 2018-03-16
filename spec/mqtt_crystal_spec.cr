@@ -70,19 +70,16 @@ describe MqttCrystal do
 
     client.ping.should be_a MqttCrystal::Packet::Pingresp
 
-    topic = "pub/#{client.id}/test"
-    message = rand.to_s
-
-    client.subscribe(topic)
+    client.subscribe(topic = "pub/#{client.id}/test")
       .should be_a MqttCrystal::Packet::Suback 
 
-    9.times {
-      client.publish(topic, message)
+    99.times {
+      client.publish(topic, payload = rand.to_s)
       packet = client.read_packet
       packet.should be_a MqttCrystal::Packet::Publish
-      packet = packet.as(MqttCrystal::Packet::Publish)
+      packet = packet.as MqttCrystal::Packet::Publish
       packet.topic.should eq topic
-      packet.payload.should eq message
+      packet.payload.should eq payload
     }
 
     spawn { client.keep_alive }

@@ -13,7 +13,11 @@ class MqttCrystal::Client
               port : UInt16 = 1883_u16,
               username : String | Nil = nil,
               password : String | Nil = nil)
-    @socket = TCPSocket.new(host, port)
+    @socket = Socket.new(family: Socket::Family::INET,
+                         type: Socket::Type::STREAM,
+                         protocol: Socket::Protocol::TCP,
+                         blocking: true)
+    @socket.as(Socket).connect(host: host, port: port)
     send MqttCrystal::Packet::Connect.new(client_id: @id, username: username, password: password)
     read_packet
   end
@@ -74,22 +78,11 @@ class MqttCrystal::Client
 
   def next_packet_id; @next_packet_id += 1 end
 
-  def read_byte : UInt8
-    b = nil
-    while !stop
-      b = socket.read_byte
-      break if b
-      sleep 0.01
-    end
-    b || 0xd0_u8
-  end
-
   def read_packet : Packet
     packet = nil
     while !stop
-      packet = Packet.create_from_header(read_byte)
+      packet = Packet.create_from_header(socket.read_byte)
       break if packet && packet.validate_flags
-      sleep 0.01
     end
     packet = packet || Packet::Pingresp.new
 
@@ -98,7 +91,8 @@ class MqttCrystal::Client
     pos = 1
 
     while !stop
-      digit = read_byte
+      digit = socket.read_byte
+      next if digit.nil?
       body_length += ((digit & 0x7F) * multiplier)
       multiplier *= 0x80
       pos += 1

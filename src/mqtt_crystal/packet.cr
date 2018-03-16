@@ -1,7 +1,8 @@
 class MqttCrystal::Packet
   property flags, body_length
 
-  def self.create_from_header(byte : UInt8)
+  def self.create_from_header(byte : UInt8 | Nil)
+    return if byte.nil?
     type_id = ((byte & 0xF0) >> 4)
     packet_class = MqttCrystal::Packet::PACKET_TYPES[type_id]
     return if packet_class.nil?

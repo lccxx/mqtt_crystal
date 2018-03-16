@@ -3,7 +3,7 @@ require "../src/mqtt_crystal"
 
 module Mqttdemo
   client = MqttCrystal::Client.new(id: "test1")
-  client.connect("172.17.0.1", 1883_u16, "xxxxx", "yyyyy")
+  p client.connect("172.17.0.1", 1883_u16, "liuchong", "xxxxxx")
   p client.subscribe("pub/#")
   spawn {
     while true
@@ -15,7 +15,7 @@ module Mqttdemo
     end
   }
   999999.times { |i|
-    client.publish("pub/test", "test #{i}")
+    client.publish("pub/oh-my", "test #{i}")
     sleep 0.01
   }
 end
