@@ -80,7 +80,10 @@ class MqttCrystal::Client
       end
     end
 
-    socket.write MqttCrystal::Packet::Connect.new(client_id: @id).bytes
+    socket.write MqttCrystal::Packet::Connect.new(client_id: @id,
+                                                  username: @username,
+                                                  password: @password).bytes
+
 
     self
   end
