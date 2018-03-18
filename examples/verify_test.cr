@@ -5,14 +5,22 @@ client = MqttCrystal::Client.new(host: "172.17.0.1").connect
 
 pub_count, get_count, err_count = 0, 0, 0
 
+stop = false
+
+Signal::INT.trap {
+  stop = true
+  sleep 5
+  Process.exit 0
+}
+
 spawn {
-  loop {
+  while !stop
     next if !client.connected?
     topic = "pub/verify/test/#{rand}"
     client.publish(topic, OpenSSL::MD5.hash(topic).map { |c| "%02x" % c }.join)
     pub_count += 1
-    sleep (rand / 100).seconds
-  }
+    sleep (rand * 10).milliseconds
+  end
 }
 
 spawn {
