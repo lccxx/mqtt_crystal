@@ -12,3 +12,5 @@
 mqttdemo
 get
 publish
+receive
+verify_test
