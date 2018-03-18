@@ -18,7 +18,7 @@ dependencies:
 ```crystal
 require "mqtt_crystal"
 
-client = MqttCrystal::Client.new(id: "test1", host: "172.17.0.1")
+client = MqttCrystal::Client.new(host: "172.17.0.1") # id, host, port, username, password
 
 client.get("pub/#") { |t, m|
   puts "#{t}, #{m}"
