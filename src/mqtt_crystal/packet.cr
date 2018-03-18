@@ -1,6 +1,28 @@
 class MqttCrystal::Packet
   property flags, body_length
 
+  def self.parse(bytes : Array(UInt8)) : Packet
+    packet = create_from_header(bytes.shift)
+    return Pingresp.new if packet.nil? || !packet.validate_flags
+
+    multiplier = 1
+    body_length = 0_u64
+    pos = 1
+
+    while bytes.size > 0
+      digit = bytes.shift
+      body_length += ((digit & 0x7F) * multiplier)
+      multiplier *= 0x80
+      pos += 1
+      break if (digit & 0x80).zero? || pos > 4
+    end
+
+    packet.body_length = body_length
+    packet.parse_body(bytes.shift(body_length)) if bytes.size >= body_length
+
+    packet
+  end
+
   def self.create_from_header(byte : UInt8 | Nil)
     return if byte.nil?
     type_id = ((byte & 0xF0) >> 4)
@@ -24,7 +46,7 @@ class MqttCrystal::Packet
     PACKET_TYPES.index(self.class).not_nil!
   end
 
-  def parse_body(buffer : Bytes)
+  def parse_body(buffer : Array(UInt8))
 
   end
 
@@ -93,10 +115,7 @@ class MqttCrystal::Packet
       break if body_length <= 0
     end
 
-    slice = Bytes.new(header.size)
-    header.map_with_index { |n, i| slice[i] = n }
-
-    concatenate(slice, body)
+    concatenate(header, body)
   end
 
   class Publish < MqttCrystal::Packet
@@ -117,7 +136,7 @@ class MqttCrystal::Packet
       concatenate(encode_string(@topic), @payload.bytes)
     end
 
-    def parse_body(buffer : Bytes)
+    def parse_body(buffer : Array(UInt8))
       return if buffer.size < 7
       len = (buffer[0] << 8) + buffer[1]
       len = buffer.size - 2 if qos.zero? && len > buffer.size - 2
@@ -261,4 +280,10 @@ class MqttCrystal::Packet
     MqttCrystal::Packet::Disconnect,
     nil
   ]
+end
+
+class String
+  def self.new(arr : Array(UInt8))
+    new(Slice.new(arr.size) { |i| arr[i] })
+  end
 end

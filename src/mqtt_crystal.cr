@@ -1,6 +1,6 @@
 require "./mqtt_crystal/*"
 
-# TODO: Write documentation for `MqttCrystal`
+# mqtt crystal client
 module MqttCrystal
-  # TODO: Put your code here
+
 end

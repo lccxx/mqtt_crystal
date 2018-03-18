@@ -2,20 +2,19 @@ require "uuid"
 require "../src/mqtt_crystal"
 
 module Mqttdemo
-  client = MqttCrystal::Client.new(id: "test1")
-  p client.connect("172.17.0.1", 1883_u16, "liuchong", "xxxxxx")
-  p client.subscribe("pub/#")
+  client = MqttCrystal::Client.new(id: UUID.random.to_s,
+                                   host: "172.17.0.1",
+                                   port: 1883_u16,
+                                   username: "liuchong",
+                                   password: "xxxxxx")
+
   spawn {
-    while true
-      packet = client.read_packet
-      if packet.is_a?(MqttCrystal::Packet::Publish)
-        packet = packet.as(MqttCrystal::Packet::Publish)
-        puts "#{packet.topic}, #{packet.payload}"
-      end
+    loop do
+      pp client.channel.receive
     end
   }
-  999999.times { |i|
-    client.publish("pub/oh-my", "test #{i}")
-    sleep 0.01
-  }
+
+  client.connect.subscribe("pub/#")
+
+  9999.times { sleep 9999 }
 end

@@ -16,7 +16,7 @@ describe MqttCrystal do
   end
 
   it "connack packet recv" do
-    MqttCrystal::Client.new(IO::Memory.new(" \x02\x00\x00")).read_packet
+    MqttCrystal::Packet.parse([ 32_u8, 2_u8, 0_u8, 0_u8 ])
       .should be_a MqttCrystal::Packet::Connack
   end
 
@@ -25,7 +25,7 @@ describe MqttCrystal do
   end
 
   it "pingresp packet recv" do
-    MqttCrystal::Client.new(IO::Memory.new("\xD0\x00")).read_packet
+    MqttCrystal::Packet.parse("\xD0\x00".bytes)
       .should be_a MqttCrystal::Packet::Pingresp
   end
 
@@ -44,16 +44,32 @@ describe MqttCrystal do
   end
 
   it "suback packet recv" do
-    MqttCrystal::Client.new(IO::Memory.new("\x90\x03\x00\x01\x00")).read_packet
+    MqttCrystal::Packet.parse("\x90\x03\x00\x01\x00".bytes)
       .should be_a MqttCrystal::Packet::Suback
 
-    MqttCrystal::Client.new(IO::Memory.new("\x90\x03\x00\x00\x00")).read_packet
+    MqttCrystal::Packet.parse("\x90\x03\x00\x00\x00".bytes)
       .should be_a MqttCrystal::Packet::Suback
   end
 
   it "publish packet send" do
     MqttCrystal::Packet::Publish.new(topic: "pub/test", payload: "test").bytes
       .should eq slice_it "0\x0E\x00\bpub/testtest"
+  end
+
+  it "publish packet recv" do
+    packet = MqttCrystal::Packet.parse("0\x11\x00\bpub/testtestttt".bytes)
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet = packet.as(MqttCrystal::Packet::Publish)
+    packet.topic.should eq "pub/test"
+    packet.payload.should eq "testttt"
+    packet.qos.should eq 0
+
+    packet = MqttCrystal::Packet.parse("0\x17\x00\x0epub/testmqttjstesssst".bytes)
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet = packet.as(MqttCrystal::Packet::Publish)
+    packet.topic.should eq "pub/testmqttjs"
+    packet.payload.should eq "tesssst"
+    packet.qos.should eq 0
   end
 
   it "puback packet send" do
@@ -63,25 +79,28 @@ describe MqttCrystal do
   end
 
   it "works" do
-    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}")
+    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "172.17.0.1")
 
-    client.connect("172.17.0.1")
-      .should be_a MqttCrystal::Packet::Connack
+    topic, payload = "pub/#{client.id}/test", rand.to_s
 
-    client.ping.should be_a MqttCrystal::Packet::Pingresp
-
-    client.subscribe(topic = "pub/#{client.id}/test")
-      .should be_a MqttCrystal::Packet::Suback 
-
-    99.times {
-      client.publish(topic, payload = rand.to_s)
-      packet = client.read_packet
-      packet.should be_a MqttCrystal::Packet::Publish
-      packet = packet.as MqttCrystal::Packet::Publish
-      packet.topic.should eq topic
-      packet.payload.should eq payload
+    spawn {
+      99.times {
+        sleep 0.01
+        client.publish(topic, payload)
+      }
     }
 
-    spawn { client.keep_alive }
+    spawn {
+      sleep 0.5.seconds
+      client.close
+      client.connected?.should eq false
+    }
+
+    client.get(topic) { |t, m|
+      it "get" {
+        t.should eq topic
+        m.should eq payload
+      }
+    }
   end
 end

@@ -2,119 +2,102 @@ require "uuid"
 require "socket"
 
 class MqttCrystal::Client
-  property socket, id, next_packet_id, stop
+  DEFAULT_SOCKET_ARGS = {
+    family: Socket::Family::INET,
+    type: Socket::Type::STREAM,
+    protocol: Socket::Protocol::TCP,
+    blocking: false
+  }
 
-  def initialize(@socket : IO = IO::Memory.new,
-                 @id : String = "S-#{UUID.random.to_s}",
+  property id, host, port, username, password, keep_alive, socket, channel, next_packet_id
+
+  def initialize(@id : String = "S-#{UUID.random.to_s}",
+                 @host : String = "127.0.0.1",
+                 @port : UInt16 = 1883_u16,
+                 @username : String | Nil = nil,
+                 @password : String | Nil = nil,
+                 @keep_alive : UInt16 = 15_u16,
+                 @auto_reconnect : Bool = true,
+                 @socket : Socket = Socket.new(**DEFAULT_SOCKET_ARGS),
+                 @channel : Channel(Packet) = Channel(Packet).new,
                  @next_packet_id : UInt16 = 0_u16,
+                 @connected : Bool = false,
                  @stop : Bool = false); end
 
-  def connect(host : String = "127.0.0.1",
-              port : UInt16 = 1883_u16,
-              username : String | Nil = nil,
-              password : String | Nil = nil)
-    @socket = Socket.new(family: Socket::Family::INET,
-                         type: Socket::Type::STREAM,
-                         protocol: Socket::Protocol::TCP,
-                         blocking: true)
-    @socket.as(Socket).connect(host: host, port: port)
-    send MqttCrystal::Packet::Connect.new(client_id: @id, username: username, password: password)
-    read_packet
+  def get(topic : String)
+    subscribe topic
+    while !@stop
+      packet = channel.receive
+      if packet.is_a?(Packet::Publish)
+        packet = packet.as(Packet::Publish)
+        yield(packet.topic, packet.payload)
+      end
+    end
+  rescue e
+    return self if @stop
+    puts "get failed #{e}"
   end
 
-  def subscribe(topic : String = "pub/#")
-    send MqttCrystal::Packet::Subscribe.new(next_packet_id, topic)
-    read_packet
+  def subscribe(topic) : self
+    connect if !@connected
+
+    socket.write MqttCrystal::Packet::Subscribe.new(topic: topic).bytes
+
+    self
   end
 
-  def get
-    while !stop
-      topic = payload = nil
+  def connect : self
+    return self if @connected || @stop
+    @connected = true
+    @socket.connect(host: @host, port: @port)
+
+    slice = Bytes.new(1 << 10 * 2)
+    spawn do
       begin
-        raise "socket not connected" if !connected?
-        packet = read_packet
-        if packet.is_a?(Packet::Publish)
-          topic = packet.topic
-          payload = packet.payload
+        while !@stop && @connected
+          count = @socket.read slice
+          raise "read failed" if count == 0
+          bytes = Array(UInt8).new(count)
+          count.times { |i| bytes << slice[i] }
+          channel.send Packet.parse(bytes)
         end
       rescue e
-        puts "handle packet failed: #{e}, reconnect"
-        sleep 1.second
-        connect if !stop
+        @connected = false
+        begin; @socket.close; rescue e; end
+        puts "connect error: #{e}"
+        if @auto_reconnect
+          sleep 1
+          connect
+        end
+        self
       end
-
-      yield topic, payload if topic && payload
     end
-  end
 
-  def publish(topic : String, message : String)
-    send MqttCrystal::Packet::Publish.new(topic: topic, payload: message)
-  end
-
-  def ping
-    send MqttCrystal::Packet::Pingreq.new
-    read_packet
-  end
-
-  def keep_alive
-    while !stop
-      ping
-      sleep 15.seconds
+    spawn do
+      while !@stop && @connected
+        sleep @keep_alive.seconds
+        socket.write MqttCrystal::Packet::Pingreq.new.bytes
+      end
     end
+
+    socket.write MqttCrystal::Packet::Connect.new(client_id: @id).bytes
+
+    self
   end
 
-  def connected?; !@socket.nil? && !@socket.not_nil!.closed? end
-
-  def send(packet : MqttCrystal::Packet)
-    return if stop
-    raise "socket not connected" if !connected?
-    slice = packet.bytes
-    @socket.not_nil!.write slice
-  rescue e
-    puts "send failed: #{e}, reconnect"
-    sleep 1.second
-    connect
+  def publish(topic : String, payload : String)
+    return if @stop || !@connected
+    socket.write MqttCrystal::Packet::Publish.new(topic: topic, payload: payload).bytes
   end
 
   def next_packet_id; @next_packet_id += 1 end
 
-  def read_packet : Packet
-    packet = nil
-    while !stop
-      packet = Packet.create_from_header(socket.read_byte)
-      break if packet && packet.validate_flags
-    end
-    packet = packet || Packet::Pingresp.new
-
-    multiplier = 1
-    body_length = 0_u64
-    pos = 1
-
-    while !stop
-      digit = socket.read_byte
-      next if digit.nil?
-      body_length += ((digit & 0x7F) * multiplier)
-      multiplier *= 0x80
-      pos += 1
-      break if (digit & 0x80).zero? || pos > 4
-    end
-
-    packet.not_nil!.body_length = body_length
-    slice = Bytes.new(body_length)
-    socket.read slice
-    packet.not_nil!.parse_body(slice)
-
-    if (packet.not_nil!.is_a?(Packet::Publish))
-      packet = packet.not_nil!.as(Packet::Publish)
-      if packet.qos > 0
-        send MqttCrystal::Packet::Puback.new(id: packet.id)
-      end
-    end
-
-    packet.not_nil!
-  end
+  def connected?; @connected end
 
   def close
-    stop = true
+    @stop = true
+    @connected = false
+    @channel.close
+    @socket.close
   end
 end
