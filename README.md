@@ -27,8 +27,6 @@ client.get("pub/#") { |t, m|
 client.publish("pub/test1", "test payload xxxxyyyyyy")
 ```
 
-new -> connect -> subscribe -> get -> publish
-
 ## Development
 
 git clone https://github.com/liu-chong/mqtt_crystal.git
