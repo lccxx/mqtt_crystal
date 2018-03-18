@@ -18,20 +18,10 @@ dependencies:
 ```crystal
 require "mqtt_crystal"
 
-client = MqttCrystal::Client.new(id: "test1")
+client = MqttCrystal::Client.new(id: "test1", host: "172.17.0.1")
 
-client.connect("172.17.0.1", 1883_u16, "liuchong", "passwordxxxx")
-
-client.subscribe("pub/test1")
-
-spawn {
-  client.get { |t, m|
-    pp t, m
-  }
-}
-
-spawn {
-  client.keep_alive
+client.get("pub/#") { |t, m|
+  puts "#{t}, #{m}"
 }
 
 client.publish("pub/test1", "test payload xxxxyyyyyy")
