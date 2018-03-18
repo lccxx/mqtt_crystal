@@ -19,7 +19,7 @@ spawn {
     topic = "pub/verify/test/#{rand}"
     client.publish(topic, OpenSSL::MD5.hash(topic).map { |c| "%02x" % c }.join)
     pub_count += 1
-    sleep (rand * 10).milliseconds
+    sleep (rand * 99).milliseconds
   end
 }
 
