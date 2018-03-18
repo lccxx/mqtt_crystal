@@ -10,3 +10,5 @@
 /shard.lock
 
 mqttdemo
+get
+publish

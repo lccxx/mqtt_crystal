@@ -86,7 +86,8 @@ class MqttCrystal::Client
   end
 
   def publish(topic : String, payload : String)
-    return if @stop || !@connected
+    return if @stop
+    connect if !@connected
     socket.write MqttCrystal::Packet::Publish.new(topic: topic, payload: payload).bytes
   end
 
