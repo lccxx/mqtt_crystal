@@ -14,3 +14,5 @@ get
 publish
 receive
 verify_test
+verify_test_get
+verify_test_publish

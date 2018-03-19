@@ -1,4 +1,5 @@
 require "uuid"
+require "uri"
 require "socket"
 
 class MqttCrystal::Client
@@ -16,13 +17,22 @@ class MqttCrystal::Client
                  @port : UInt16 = 1883_u16,
                  @username : String | Nil = nil,
                  @password : String | Nil = nil,
+                 @url : String | Nil = nil,
                  @keep_alive : UInt16 = 15_u16,
                  @auto_reconnect : Bool = true,
                  @socket : Socket = Socket.new(**DEFAULT_SOCKET_ARGS),
                  @channel : Channel(Packet) = Channel(Packet).new,
                  @next_packet_id : UInt16 = 0_u16,
                  @connected : Bool = false,
-                 @stop : Bool = false); end
+                 @stop : Bool = false)
+    if @url
+      uri = URI.parse @url.not_nil!
+      @host = uri.host.not_nil! if uri.host
+      @port = uri.port.not_nil!.to_u16 if uri.port
+      @username = uri.user
+      @password = uri.password
+    end
+  end
 
   def get(topic : String)
     subscribe topic

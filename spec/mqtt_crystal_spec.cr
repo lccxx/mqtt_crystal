@@ -109,4 +109,24 @@ describe MqttCrystal do
       }
     }
   end
+
+  it "mqtt connect url" do
+    client = MqttCrystal::Client.new(url: "mqtt://172.17.0.1")
+    client.host.should eq "172.17.0.1"
+    client.port.should eq 1883_u16
+    client.username.should be_a Nil
+    client.password.should be_a Nil
+
+    client = MqttCrystal::Client.new(url: "mqtt://172.17.0.1:1234")
+    client.host.should eq "172.17.0.1"
+    client.port.should eq 1234_u16
+    client.username.should be_a Nil
+    client.password.should be_a Nil
+
+    client = MqttCrystal::Client.new(url: "mqtt://uuuuu:pppppp@iot.eclipse.org:1234")
+    client.host.should eq "iot.eclipse.org"
+    client.port.should eq 1234_u16
+    client.username.should eq "uuuuu"
+    client.password.should eq "pppppp"
+  end
 end
