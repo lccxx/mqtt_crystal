@@ -88,10 +88,21 @@ class MqttCrystal::Client
     self
   end
 
+  def connect
+    begin
+      yield self
+    ensure
+      close
+    end
+  end
+
   def publish(topic : String, payload : String)
     return if @stop
     connect if !@connected
-    socket.write MqttCrystal::Packet::Publish.new(topic: topic, payload: payload).bytes
+    socket.write MqttCrystal::Packet::Publish.new(id: next_packet_id,
+                                                  qos: 1_u8,
+                                                  topic: topic,
+                                                  payload: payload).bytes
   end
 
   def next_packet_id; @next_packet_id += 1 end

@@ -126,14 +126,17 @@ class MqttCrystal::Packet
                    @id : UInt16 = 0_u16,
                    @qos : UInt8 = 0_u8,
                    @flags : Array(Bool) = [ false, false, false, false ],
-                   @body_length : UInt64 = 0_u64); end
+                   @body_length : UInt64 = 0_u64)
+      @flags[1] = (@qos & 0x01 == 0x01)
+      @flags[2] = (@qos & 0x02 == 0x02)
+    end
 
     def qos
       (@flags[1] ? 0x01 : 0x00) | (@flags[2] ? 0x02 : 0x00)
     end
 
     def encode_body
-      concatenate(encode_string(@topic), @payload.bytes)
+      concatenate(encode_string(@topic), @qos > 0 ? encode_short(@id) : Bytes.new(0), @payload.bytes)
     end
 
     def parse_body(buffer : Array(UInt8))

@@ -54,6 +54,12 @@ describe MqttCrystal do
   it "publish packet send" do
     MqttCrystal::Packet::Publish.new(topic: "pub/test", payload: "test").bytes
       .should eq slice_it "0\x0E\x00\bpub/testtest"
+
+    MqttCrystal::Packet::Publish.new(id: 1_u16, qos: 1_u8, topic: "pub/test", payload: "teeest").bytes
+      .should eq slice_it "2\x12\x00\bpub/test\x00\x01teeest"
+
+    MqttCrystal::Packet::Publish.new(id: 2_u16, qos: 1_u8, topic: "pub/test", payload: "teeest").bytes
+      .should eq slice_it "2\x12\x00\bpub/test\x00\x02teeest"
   end
 
   it "publish packet recv" do
