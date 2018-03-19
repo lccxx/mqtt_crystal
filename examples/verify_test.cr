@@ -29,7 +29,7 @@ spawn {
   end
 }
 
-MqttCrystal::Client.new(host: "172.17.0.1").connect.get("pub/verify/test/#") { |t, m|
+MqttCrystal::Client.new(host: "172.17.0.1").get("pub/verify/test/#") { |t, m|
   get_count += 1
   err_count += 1 if OpenSSL::MD5.hash(t).map { |c| "%02x" % c }.join != m
 }
