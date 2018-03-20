@@ -1,6 +1,130 @@
 require "./spec_helper"
 
 describe MqttCrystal do
+  it "packet types & flags" do
+    packet = MqttCrystal::Packet.create_from_header(0_u8)
+    packet.should be_a Nil
+
+    packet = MqttCrystal::Packet.create_from_header(0x10_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Connect
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x20_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Connack
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x30_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x31_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x32_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, true, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x33_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, true, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x34_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, false, true, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x35_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [  true, false, true, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x36_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, true, true, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x37_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, true, true, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x38_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, false, false, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x39_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, false, false, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3a_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, true, false, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3b_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, true, false, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3c_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, false, true, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3d_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, false, true, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3e_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ false, true, true, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x3f_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet.flags.should eq [ true, true, true, true ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x40_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Puback
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x50_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Pubrec
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x62_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Pubrel
+    packet.flags.should eq [ false, true, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x70_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Pubcomp
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x82_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Subscribe
+    packet.flags.should eq [ false, true, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0x90_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Suback
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xa2_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Unsubscribe
+    packet.flags.should eq [ false, true, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xb0_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Unsuback
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xc0_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Pingreq
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xd0_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Pingresp
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xe0_u8).not_nil!
+    packet.should be_a MqttCrystal::Packet::Disconnect
+    packet.flags.should eq [ false, false, false, false ]
+
+    packet = MqttCrystal::Packet.create_from_header(0xf0_u8)
+    packet.should be_a Nil
+  end
+
   it "connect packet send" do
     MqttCrystal::Packet::Connect.new(client_id: "test1", username: "liuchong", password: "lc123789").bytes
       .should eq slice_it "\x10%\x00\x04MQTT\x04\xC2\x00\x0F\x00\x05test1\x00\bliuchong\x00\blc123789"
@@ -31,16 +155,16 @@ describe MqttCrystal do
 
   it "subscribe packet send" do
     MqttCrystal::Packet::Subscribe.new(topic: "pub/test").bytes
-      .should eq slice_it "\x82\r\x00\x00\x00\bpub/test\x00"
+      .should eq slice_it "\x82\r\x00\x00\x00\bpub/test\x01"
 
     MqttCrystal::Packet::Subscribe.new(id: 1_u16, topic: "pub/t").bytes
-      .should eq slice_it "\x82\n\x00\x01\x00\x05pub/t\x00"
+      .should eq slice_it "\x82\n\x00\x01\x00\x05pub/t\x01"
 
     MqttCrystal::Packet::Subscribe.new(id: 535_u16, topic: "pub/t").bytes
-      .should eq slice_it "\x82\n\x02\x17\x00\x05pub/t\x00"
+      .should eq slice_it "\x82\n\x02\x17\x00\x05pub/t\x01"
 
     MqttCrystal::Packet::Subscribe.new(id: 1_u16, topic: "pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test").bytes
-      .should eq slice_it "\x825\x00\x01\x000pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test\x00"
+      .should eq slice_it "\x825\x00\x01\x000pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test\x01"
   end
 
   it "suback packet recv" do
@@ -76,6 +200,13 @@ describe MqttCrystal do
     packet.topic.should eq "pub/testmqttjs"
     packet.payload.should eq "tesssst"
     packet.qos.should eq 0
+
+    packet = MqttCrystal::Packet.parse("2\x1e\x00\bpub/test\x00\x020.9067131697364054".bytes)
+    packet.should be_a MqttCrystal::Packet::Publish
+    packet = packet.as MqttCrystal::Packet::Publish
+    packet.topic.should eq "pub/test"
+    packet.payload.should eq "0.9067131697364054"
+    packet.qos.should eq 1
   end
 
   it "puback packet send" do

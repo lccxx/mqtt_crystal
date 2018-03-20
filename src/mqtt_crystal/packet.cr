@@ -26,11 +26,11 @@ class MqttCrystal::Packet
   def self.create_from_header(byte : UInt8 | Nil)
     return if byte.nil?
     type_id = ((byte & 0xF0) >> 4)
-    packet_class = MqttCrystal::Packet::PACKET_TYPES[type_id]
+    packet_class = Packet::PACKET_TYPES[type_id]
     return if packet_class.nil?
 
     flags = Array(Bool).new()
-    4.times { |i| flags << (byte & (2**i) != 0) }
+    4.times { |i| flags << (byte & (1_u8 << i) != 0_u8) }
 
     packet_class.new(flags: flags)
   end
@@ -38,9 +38,7 @@ class MqttCrystal::Packet
   def initialize(@flags : Array(Bool) = [ false, false, false, false ],
                  @body_length : UInt64 = 0_u64); end
 
-  def validate_flags
-    return flags == [ false, false, false, false ]
-  end
+  def validate_flags; true end
 
   def type_id : Int32
     PACKET_TYPES.index(self.class).not_nil!
@@ -118,7 +116,7 @@ class MqttCrystal::Packet
     concatenate(header, body)
   end
 
-  class Publish < MqttCrystal::Packet
+  class Publish < Packet
     property id, topic, payload, qos
 
     def initialize(@topic : String = "pub/test",
@@ -127,12 +125,13 @@ class MqttCrystal::Packet
                    @qos : UInt8 = 0_u8,
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64)
-      @flags[1] = (@qos & 0x01 == 0x01)
-      @flags[2] = (@qos & 0x02 == 0x02)
-    end
-
-    def qos
-      (@flags[1] ? 0x01 : 0x00) | (@flags[2] ? 0x02 : 0x00)
+      if @qos != 0
+        @flags[1] = (@qos & 0x01 == 0x01)
+        @flags[2] = (@qos & 0x02 == 0x02)
+      end
+      if @flags != [ false, false, false, false ]
+        @qos = (@flags[1] ? 0x01_u8 : 0x00_u8) | (@flags[2] ? 0x02_u8 : 0x00_u8)
+      end
     end
 
     def encode_body
@@ -156,7 +155,7 @@ class MqttCrystal::Packet
     end
   end
 
-  class Connect < MqttCrystal::Packet
+  class Connect < Packet
     def initialize(@client_id : String = UUID.random.to_s,
                    @username : String | Nil = nil,
                    @password : String | Nil = nil,
@@ -188,11 +187,11 @@ class MqttCrystal::Packet
     end
   end
 
-  class Connack < MqttCrystal::Packet
+  class Connack < Packet
 
   end
 
-  class Puback < MqttCrystal::Packet
+  class Puback < Packet
     def initialize(@id : UInt16 = 0_u16,
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64)
@@ -207,21 +206,21 @@ class MqttCrystal::Packet
     end
   end
 
-  class Pubrec < MqttCrystal::Packet
+  class Pubrec < Packet
 
   end
 
-  class Pubrel < MqttCrystal::Packet
+  class Pubrel < Packet
     def validate_flags
       return flags == [ false, true, false, false ]
     end
   end
 
-  class Pubcomp < MqttCrystal::Packet
+  class Pubcomp < Packet
 
   end
 
-  class Subscribe < MqttCrystal::Packet
+  class Subscribe < Packet
     def initialize(@id : UInt16 = 0_u16,
                    @topic : String = "pub/test",
                    @flags : Array(Bool) = [ false, true, false, false ],
@@ -232,25 +231,25 @@ class MqttCrystal::Packet
     end
 
     def encode_body : Bytes
-      concatenate(encode_short(@id), encode_string(@topic), [ 0_u8 ])
+      concatenate(encode_short(@id), encode_string(@topic), [ 1_u8 ])
     end
   end
 
-  class Suback < MqttCrystal::Packet
+  class Suback < Packet
 
   end
 
-  class Unsubscribe < MqttCrystal::Packet
+  class Unsubscribe < Packet
     def validate_flags
       return flags == [ false, true, false, false ]
     end
   end
 
-  class Unsuback < MqttCrystal::Packet
+  class Unsuback < Packet
 
   end
 
-  class Pingreq < MqttCrystal::Packet
+  class Pingreq < Packet
     PING_DATA = slice_it "\xC0\x00"
 
     def bytes
@@ -258,29 +257,29 @@ class MqttCrystal::Packet
     end
   end
 
-  class Pingresp < MqttCrystal::Packet
+  class Pingresp < Packet
 
   end
 
-  class Disconnect < MqttCrystal::Packet
+  class Disconnect < Packet
 
   end 
 
   PACKET_TYPES = [ nil,
-    MqttCrystal::Packet::Connect,
-    MqttCrystal::Packet::Connack,
-    MqttCrystal::Packet::Publish,
-    MqttCrystal::Packet::Puback,
-    MqttCrystal::Packet::Pubrec,
-    MqttCrystal::Packet::Pubrel,
-    MqttCrystal::Packet::Pubcomp,
-    MqttCrystal::Packet::Subscribe,
-    MqttCrystal::Packet::Suback,
-    MqttCrystal::Packet::Unsubscribe,
-    MqttCrystal::Packet::Unsuback,
-    MqttCrystal::Packet::Pingreq,
-    MqttCrystal::Packet::Pingresp,
-    MqttCrystal::Packet::Disconnect,
+    Packet::Connect,
+    Packet::Connack,
+    Packet::Publish,
+    Packet::Puback,
+    Packet::Pubrec,
+    Packet::Pubrel,
+    Packet::Pubcomp,
+    Packet::Subscribe,
+    Packet::Suback,
+    Packet::Unsubscribe,
+    Packet::Unsuback,
+    Packet::Pingreq,
+    Packet::Pingresp,
+    Packet::Disconnect,
     nil
   ]
 end

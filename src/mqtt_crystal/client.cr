@@ -41,6 +41,7 @@ class MqttCrystal::Client
       if packet.is_a?(Packet::Publish)
         packet = packet.as(Packet::Publish)
         yield(packet.topic, packet.payload)
+        socket.write Packet::Puback.new(id: packet.id).bytes if packet.qos > 0
       end
     end
   rescue e
@@ -69,6 +70,7 @@ class MqttCrystal::Client
           raise "read failed" if count == 0
           bytes = Array(UInt8).new(count)
           count.times { |i| bytes << slice[i] }
+          # pp bytes.map { |b| b.chr }.join
           channel.send Packet.parse(bytes)
         end
       rescue e
