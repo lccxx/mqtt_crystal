@@ -18,7 +18,8 @@ dependencies:
 ```crystal
 require "mqtt_crystal"
 
-client = MqttCrystal::Client.new(url: "mqtt://iot.eclipse.org") # id, host, port, username, password, url
+# host, port, username, password or url
+client = MqttCrystal::Client.new(url: "mqtt://iot.eclipse.org") # mqtt://user:password@iot.eclipse.org:1883
 
 spawn {
   999.times { |i|
