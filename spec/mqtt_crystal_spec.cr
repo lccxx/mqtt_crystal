@@ -200,6 +200,7 @@ describe MqttCrystal do
     packet.topic.should eq "pub/testmqttjs"
     packet.payload.should eq "tesssst"
     packet.qos.should eq 0
+    packet.id.should eq 0
 
     packet = MqttCrystal::Packet.parse("2\x1e\x00\bpub/test\x00\x020.9067131697364054".bytes)
     packet.should be_a MqttCrystal::Packet::Publish
@@ -207,6 +208,7 @@ describe MqttCrystal do
     packet.topic.should eq "pub/test"
     packet.payload.should eq "0.9067131697364054"
     packet.qos.should eq 1
+    packet.id.should eq 2
   end
 
   it "puback packet send" do

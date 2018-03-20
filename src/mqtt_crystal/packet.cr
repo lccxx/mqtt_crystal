@@ -18,7 +18,12 @@ class MqttCrystal::Packet
     end
 
     packet.body_length = body_length
-    packet.parse_body(bytes.shift(body_length)) if bytes.size >= body_length
+    if bytes.size >= body_length
+      packet.parse_body(bytes.shift(body_length))
+    else
+      pp [ "packet.parce error", packet, bytes.size, bytes ]
+      return Pingresp.new
+    end
 
     packet
   end
