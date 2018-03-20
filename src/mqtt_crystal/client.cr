@@ -42,7 +42,7 @@ class MqttCrystal::Client
       if packet.is_a?(Packet::Publish)
         packet = packet.as(Packet::Publish)
         yield(packet.topic, packet.payload)
-        socket.write Packet::Puback.new(id: packet.id).bytes if packet.qos > 0
+        send Packet::Puback.new(id: packet.id) if packet.qos > 0
       end
     end
   rescue e
@@ -53,14 +53,12 @@ class MqttCrystal::Client
   def subscribe(topic : String) : self
     connect if !@connected
 
-    socket.write MqttCrystal::Packet::Subscribe.new(topic: topic).bytes
     @topics << topic
-
-    self
+    subscribe([ topic ])
   end
 
   def subscribe(topics : Array(String)) : self
-    topics.each { |topic| subscribe(topic) }
+    topics.each { |topic| send Packet::Subscribe.new(topic: topic) }
 
     self
   end
@@ -71,7 +69,7 @@ class MqttCrystal::Client
 
     @socket.connect(host: @host, port: @port)
 
-    @socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
+    send Packet::Connect.new(client_id: @id, username: @username, password: @password)
 
     slice = Bytes.new(1 << 10 * 2)
     spawn do
@@ -91,7 +89,7 @@ class MqttCrystal::Client
     spawn do
       while !@stop && @connected
         sleep @keep_alive.seconds
-        socket.write MqttCrystal::Packet::Pingreq.new.bytes
+        send Packet::Pingreq.new
       end
     end
 
@@ -125,12 +123,13 @@ class MqttCrystal::Client
   end
 
   def publish(topic : String, payload : String)
+    send Packet::Publish.new(id: next_packet_id, qos: 1_u8, topic: topic, payload: payload)
+  end
+
+  def send(packet : Packet)
     return if @stop
-    while !@connected; sleep 0.5 end
-    socket.write MqttCrystal::Packet::Publish.new(id: next_packet_id,
-                                                  qos: 1_u8,
-                                                  topic: topic,
-                                                  payload: payload).bytes
+    while !@stop && !@connected; sleep 0.5 end
+    socket.write packet.bytes
   end
 
   def next_packet_id; @next_packet_id += 1 end
