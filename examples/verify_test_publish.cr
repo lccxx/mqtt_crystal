@@ -12,8 +12,8 @@ Signal::INT.trap {
 }
 
 spawn {
-  MqttCrystal::Client.new(host: "172.17.0.1").connect { |client|
-    10000.times {
+  MqttCrystal::Client.new(host: "iot.eclipse.org").connect { |client|
+    1000.times {
       break if stop
       topic = "lccc/verify/test/#{rand}"
       client.publish(topic, OpenSSL::MD5.hash(topic).map { |c| "%02x" % c }.join)

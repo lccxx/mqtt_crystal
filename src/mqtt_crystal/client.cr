@@ -12,7 +12,7 @@ class MqttCrystal::Client
 
   property id, host, port, username, password, keep_alive, socket, channel, next_packet_id
 
-  def initialize(@id : String = "S-#{UUID.random.to_s}",
+  def initialize(@id : String = "s-#{UUID.random.to_s}",
                  @host : String = "127.0.0.1",
                  @port : UInt16 = 1883_u16,
                  @username : String | Nil = nil,
@@ -102,6 +102,8 @@ class MqttCrystal::Client
   end
 
   def connect
+    connect
+
     begin
       yield self
     ensure
@@ -114,6 +116,7 @@ class MqttCrystal::Client
     @connected = false
     begin; @socket.close; rescue e; end
     sleep 1
+    @id = "s-#{UUID.random.to_s}"
     @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
     connect
     subscribe @topics
