@@ -20,12 +20,14 @@ require "mqtt_crystal"
 
 client = MqttCrystal::Client.new(url: "mqtt://iot.eclipse.org") # id, host, port, username, password, url
 
-# you may need spawn it
+# you may need wrap it spawn
 client.get("lccc/teeest/#") { |t, m|
   puts "#{t}, #{m}"
 }
 
 client.publish("lccc/teeest/topiiic", "test payload xxxxyyyyyy")
+
+# sleep 99
 ```
 
 ## Development
