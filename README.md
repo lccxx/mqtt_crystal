@@ -1,4 +1,4 @@
-# mqtt_crystal[![Build Status](https://api.travis-ci.org/liu-chong/mqtt_crystal.svg)](https://travis-ci.org/liu-chong/mqtt_crystal)
+# mqtt_crystal [![Build Status](https://api.travis-ci.org/liu-chong/mqtt_crystal.svg)](https://travis-ci.org/liu-chong/mqtt_crystal)
 
 pure crystal mqtt client
 
