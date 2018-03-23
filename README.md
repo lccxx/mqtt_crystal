@@ -18,13 +18,19 @@ dependencies:
 ```crystal
 require "mqtt_crystal"
 
-client = MqttCrystal::Client.new(host: "172.17.0.1") # id, host, port, username, password, url
+# host, port, username, password or url
+client = MqttCrystal::Client.new(url: "mqtt://iot.eclipse.org") # mqtt://user:password@iot.eclipse.org:1883
 
-client.get("pub/#") { |t, m|
-  puts "#{t}, #{m}"
+spawn {
+  999.times { |i|
+    sleep rand.seconds
+    client.publish("lccc/teeest/topiiic", "test #{i} payload xxxxyyyyyy")
+  }
 }
 
-client.publish("pub/test1", "test payload xxxxyyyyyy")
+client.get("lccc/teeest/#") { |t, m|
+  puts "#{t}, #{m}"
+}
 ```
 
 ## Development
