@@ -222,23 +222,35 @@ describe MqttCrystal do
 
     topic, payload = "pub/#{client.id}/test", rand.to_s
 
+    publish_count = 7
+    max_wait = 200
+
     spawn {
-      99.times {
-        sleep 0.01
+      while !client.subscribed?; sleep 10.milliseconds end
+      publish_count.times {
+        sleep (rand(max_wait) + 50).milliseconds
         client.publish(topic, payload)
       }
     }
 
     spawn {
-      sleep 0.5.seconds
-      client.close
-      client.connected?.should eq false
+      sleep (max_wait * publish_count * 2).milliseconds
+      it "wait too long" {
+        client.close
+        false.should eq true
+      }
     }
+
+    get_count = 0
 
     client.get(topic) { |t, m|
       it "get" {
         t.should eq topic
         m.should eq payload
+        if (get_count += 1) == publish_count
+          client.close
+          client.connected?.should eq false
+        end
       }
     }
   end

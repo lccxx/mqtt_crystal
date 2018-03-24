@@ -24,7 +24,9 @@ class MqttCrystal::Client
                  @socket : Socket = Socket.new(**DEFAULT_SOCKET_ARGS),
                  @channel : Channel(Packet) = Channel(Packet).new,
                  @next_packet_id : UInt16 = 0_u16,
+                 @connecting : Bool = false,
                  @connected : Bool = false,
+                 @subscribed : Bool = false,
                  @stop : Bool = false)
     if @url
       uri = URI.parse @url.not_nil!
@@ -64,30 +66,37 @@ class MqttCrystal::Client
   end
 
   def connect : self
-    return self if @connected || @stop
-    @connected = true
+    return self if @connecting || @connected || @stop
+    @connecting = true
 
     @socket.connect(host: @host, port: @port)
 
-    send Packet::Connect.new(client_id: @id, username: @username, password: @password)
-
     slice = Bytes.new(1 << 10 * 2)
     spawn do
-      while !@stop && @connected
+      while !@stop
         count = @socket.read slice
         raise "read failed" if count == 0
         bytes = Array(UInt8).new(count)
         count.times { |i| bytes << slice[i] }
         # pp bytes.map { |b| b.chr }.join
-        channel.send Packet.parse(bytes)
+        packet = Packet.parse(bytes)
+        if packet.is_a?(Packet::Connack)
+          @connecting = false
+          @connected = true
+        elsif packet.is_a?(Packet::Suback)
+          @subscribed = true
+        end
+        channel.send packet
       end
     rescue spawn_read_e
       pp spawn_read_e
       reconnect
     end
 
+    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
+
     spawn do
-      while !@stop && @connected
+      while !@stop
         sleep @keep_alive.seconds
         send Packet::Pingreq.new
       end
@@ -111,7 +120,7 @@ class MqttCrystal::Client
 
   def reconnect : self
     return self if !@auto_reconnect
-    @connected = false
+    @connecting = @connected = @subscribed = false
     begin; @socket.close; rescue e; end
     sleep 1
     @id = "s-#{UUID.random.to_s}"
@@ -135,6 +144,8 @@ class MqttCrystal::Client
   def next_packet_id; @next_packet_id += 1 end
 
   def connected?; @connected end
+
+  def subscribed?; @subscribed end
 
   def close
     @stop = true
