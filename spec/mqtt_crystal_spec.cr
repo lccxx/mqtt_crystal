@@ -218,7 +218,7 @@ describe MqttCrystal do
   end
 
   it "works" do
-    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "172.17.0.1")
+    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.eclipse.org")
 
     topic, payload = "pub/#{client.id}/test", rand.to_s
 
