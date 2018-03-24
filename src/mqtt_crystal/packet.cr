@@ -2,6 +2,7 @@ class MqttCrystal::Packet
   property flags, body_length
 
   def self.parse(bytes : Array(UInt8)) : Packet
+    while bytes.size == 0; sleep (rand(50) + 10).milliseconds end
     packet = create_from_header(bytes.shift)
     return Pingresp.new if packet.nil? || !packet.validate_flags
 
@@ -17,13 +18,8 @@ class MqttCrystal::Packet
       break if (digit & 0x80).zero? || pos > 4
     end
 
-    packet.body_length = body_length
-    if bytes.size >= body_length
-      packet.parse_body(bytes.shift(body_length))
-    else
-      pp [ "packet.parce error", packet, bytes.size, bytes ]
-      return Pingresp.new
-    end
+    while bytes.size < body_length; sleep (rand(50) + 10).milliseconds end
+    packet.parse_body(bytes.shift(body_length))
 
     packet
   end

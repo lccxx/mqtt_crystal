@@ -27,13 +27,34 @@ class MqttCrystal::Client
                  @connecting : Bool = false,
                  @connected : Bool = false,
                  @subscribed : Bool = false,
-                 @stop : Bool = false)
+                 @stop : Bool = false,
+                 @buffer : Array(UInt8) = Array(UInt8).new)
     if @url
       uri = URI.parse @url.not_nil!
       @host = uri.host.not_nil! if uri.host
       @port = uri.port.not_nil!.to_u16 if uri.port
       @username = uri.user
       @password = uri.password
+    end
+
+    spawn do
+      while !@stop
+        packet = Packet.parse(@buffer)
+        if packet.is_a?(Packet::Connack)
+          @connecting = false
+          @connected = true
+        elsif packet.is_a?(Packet::Suback)
+          @subscribed = true
+        end
+        channel.send packet
+      end
+    end
+
+    spawn do
+      while !@stop
+        sleep @keep_alive.seconds
+        send Packet::Pingreq.new
+      end
     end
   end
 
@@ -76,31 +97,14 @@ class MqttCrystal::Client
       while !@stop
         count = @socket.read slice
         raise "read failed" if count == 0
-        bytes = Array(UInt8).new(count)
-        count.times { |i| bytes << slice[i] }
-        # pp bytes.map { |b| b.chr }.join
-        packet = Packet.parse(bytes)
-        if packet.is_a?(Packet::Connack)
-          @connecting = false
-          @connected = true
-        elsif packet.is_a?(Packet::Suback)
-          @subscribed = true
-        end
-        channel.send packet
+        count.times { |i| @buffer << slice[i] }
       end
     rescue spawn_read_e
       pp spawn_read_e
       reconnect
-    end
+    end 
 
-    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
-
-    spawn do
-      while !@stop
-        sleep @keep_alive.seconds
-        send Packet::Pingreq.new
-      end
-    end
+    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes 
 
     self
   rescue connect_e
