@@ -218,23 +218,29 @@ describe MqttCrystal do
   end
 
   it "works" do
-    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.eclipse.org")
+    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.liuchong.me")
 
     topic, payload = "pub/#{client.id}/test", rand.to_s
 
     publish_count = 7
-    max_wait = 200
+    publish_max_wait = 200
+    subscribed_max_wait = 10
+    subscribed_wait_count = 0
 
     spawn {
-      while !client.subscribed?; sleep 10.milliseconds end
+      while !client.subscribed?
+        sleep subscribed_max_wait.milliseconds
+        subscribed_wait_count += 1
+      end
       publish_count.times {
-        sleep (rand(max_wait) + 50).milliseconds
+        sleep (rand(publish_max_wait) + 50).milliseconds
         client.publish(topic, payload)
       }
     }
 
     spawn {
-      sleep (max_wait * publish_count * 2).milliseconds
+      sleep (subscribed_max_wait * subscribed_wait_count +
+             publish_max_wait * publish_count * 7 + 2000).milliseconds
       it "wait too long" {
         client.close
         false.should eq true
