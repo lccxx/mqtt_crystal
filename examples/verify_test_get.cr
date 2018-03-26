@@ -10,7 +10,7 @@ spawn {
   end
 }
 
-MqttCrystal::Client.new(host: "iot.eclipse.org").get("lccc/verify/test/#") { |t, m|
+MqttCrystal::Client.new(host: "iot.liuchong.me").get("lccc/verify/test/#") { |t, m|
   get_count += 1
   err_count += 1 if OpenSSL::MD5.hash(t).map { |c| "%02x" % c }.join != m
 }
