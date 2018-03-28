@@ -140,8 +140,20 @@ describe MqttCrystal do
   end
 
   it "connack packet recv" do
-    MqttCrystal::Packet.parse([ 32_u8, 2_u8, 0_u8, 0_u8 ])
-      .should be_a MqttCrystal::Packet::Connack
+    packet = MqttCrystal::Packet.parse([ 32_u8, 2_u8, 0_u8, 0_u8 ])
+    packet.should be_a MqttCrystal::Packet::Connack
+    packet = packet.as(MqttCrystal::Packet::Connack)
+    packet.session_present.should be_false
+    packet.response.should be_a MqttCrystal::Packet::ConnackResponse
+    packet.response.should eq MqttCrystal::Packet::ConnackResponse::Accepted
+
+    packet = MqttCrystal::Packet.parse([ 32_u8, 2_u8, 1_u8, 1_u8 ])
+    packet.should be_a MqttCrystal::Packet::Connack
+    packet = packet.as(MqttCrystal::Packet::Connack)
+    packet.session_present.should be_true
+    packet.response.should be_a MqttCrystal::Packet::ConnackResponse
+    packet.response.should eq MqttCrystal::Packet::ConnackResponse::UnacceptableProtocolVersion
+
   end
 
   it "ping packet send" do
