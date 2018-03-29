@@ -189,6 +189,26 @@ class MqttCrystal::Packet
   end
 
   class Connack < Packet
+    property session_present, response
+
+    # If this is a clean session, @session_present must be false
+    # otherwise up to the implementation to decide if the session exists
+    def initialize(@session_present = false,
+                   @response = ConnackResponse::Accepted,
+                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @body_length : UInt64 = 0_u64); end
+
+    def encode_body : Bytes
+      slice = Bytes.new(2)
+      slice[0] = session_present ? 1_u8 : 0_u8
+      slice[1] = response.value
+      slice
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      @session_present = buffer[0] == 1 ? true : false
+      @response = ConnackResponse.new(buffer[1])
+    end
 
   end
 
@@ -283,6 +303,15 @@ class MqttCrystal::Packet
     Packet::Disconnect,
     nil
   ]
+
+  enum ConnackResponse : UInt8
+    Accepted
+    UnacceptableProtocolVersion
+    IdentifierRejected
+    ServerUnavailable
+    BadUserOrPass
+    NotAuthorized
+  end
 end
 
 class String
