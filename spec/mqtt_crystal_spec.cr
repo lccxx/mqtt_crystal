@@ -1,4 +1,5 @@
 require "./spec_helper"
+require "pretty_print"
 
 describe MqttCrystal do
   it "packet types & flags" do
@@ -177,6 +178,20 @@ describe MqttCrystal do
 
     MqttCrystal::Packet::Subscribe.new(id: 1_u16, topic: "pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test").bytes
       .should eq slice_it "\x825\x00\x01\x000pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test\x01"
+  end
+
+  it "subscribe packet recv" do
+    packet = MqttCrystal::Packet.parse("\x825\x00\x01\x000pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test\x01".bytes)
+    packet.should be_a MqttCrystal::Packet::Subscribe
+    packet = packet.as(MqttCrystal::Packet::Subscribe)
+    packet.qos.should eq 1_u8
+    packet.topic.should eq "pub/CR-901c0c12-8b89-4fa1-9e2e-951cd47e5e88/test"
+
+    packet = MqttCrystal::Packet.parse("\x82\n\x02\x17\x00\x05pub/t\x00".bytes)
+    packet.should be_a MqttCrystal::Packet::Subscribe
+    packet = packet.as(MqttCrystal::Packet::Subscribe)
+    packet.qos.should eq 0_u8
+    packet.topic.should eq "pub/t"
   end
 
   it "suback packet recv" do
