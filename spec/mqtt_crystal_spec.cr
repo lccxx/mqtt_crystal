@@ -1,5 +1,4 @@
 require "./spec_helper"
-require "pretty_print"
 
 describe MqttCrystal do
   it "packet types & flags" do
