@@ -242,8 +242,11 @@ class MqttCrystal::Packet
   end
 
   class Subscribe < Packet
+    property qos, topic
+
     def initialize(@id : UInt16 = 0_u16,
                    @topic : String = "pub/test",
+                   @qos : UInt8 = 1_u8,
                    @flags : Array(Bool) = [ false, true, false, false ],
                    @body_length : UInt64 = 0_u64); end
 
@@ -251,8 +254,25 @@ class MqttCrystal::Packet
       return flags == [ false, true, false, false ]
     end
 
+    # Varialble Header
+    # 2 bytes = packet_id
+    # Payload
+    # 2 bytes = topic_length
+    # topic_length bytes = topic
+    # 1 byte = qos
+
     def encode_body : Bytes
-      concatenate(encode_short(@id), encode_string(@topic), [ 1_u8 ])
+      concatenate(encode_short(@id), encode_string(@topic), [ @qos ])
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      return if buffer.size < 6 # minimum 1 char topic
+      @id = (buffer[0].to_u16 << 8) + buffer[1].to_u16
+      topic_length = (buffer[2] << 8) + buffer[3]
+      return if topic_length + 5 != buffer.size
+      @qos = buffer[-1]
+      @topic = String.new(buffer[4, topic_length])
+      puts @topic
     end
   end
 
