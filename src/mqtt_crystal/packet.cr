@@ -272,7 +272,6 @@ class MqttCrystal::Packet
       return if topic_length + 5 != buffer.size
       @qos = buffer[-1]
       @topic = String.new(buffer[4, topic_length])
-      puts @topic
     end
   end
 
