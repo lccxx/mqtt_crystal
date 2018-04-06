@@ -193,12 +193,24 @@ describe MqttCrystal do
     packet.topic.should eq "pub/t"
   end
 
-  it "suback packet recv" do
-    MqttCrystal::Packet.parse("\x90\x03\x00\x01\x00".bytes)
-      .should be_a MqttCrystal::Packet::Suback
+  it "suback packet send" do
+    MqttCrystal::Packet::Suback.new.bytes.should eq slice_it "\x90\x03\x00\x00\x00"
+  end
 
-    MqttCrystal::Packet.parse("\x90\x03\x00\x00\x00".bytes)
-      .should be_a MqttCrystal::Packet::Suback
+  it "suback packet recv" do
+    packet = MqttCrystal::Packet.parse("\x90\x03\x00\x01\x00".bytes)
+    packet.should be_a MqttCrystal::Packet::Suback
+    packet = packet.as(MqttCrystal::Packet::Suback)
+    packet.id.should eq 1
+    packet.response.should be_a MqttCrystal::Packet::SubackResponse
+    packet.response.should eq MqttCrystal::Packet::SubackResponse::SuccessMaxQoS0
+
+    packet = MqttCrystal::Packet.parse("\x90\x03\x00\x08\x80".bytes)
+    packet.should be_a MqttCrystal::Packet::Suback
+    packet = packet.as(MqttCrystal::Packet::Suback)
+    packet.id.should eq 8
+    packet.response.should be_a MqttCrystal::Packet::SubackResponse
+    packet.response.should eq MqttCrystal::Packet::SubackResponse::Failure
   end
 
   it "publish packet send" do
