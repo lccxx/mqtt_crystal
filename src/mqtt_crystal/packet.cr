@@ -276,6 +276,22 @@ class MqttCrystal::Packet
   end
 
   class Suback < Packet
+    property id, response
+    def initialize(@id : UInt16 = 0_u16,
+                   @response = SubackResponse::SuccessMaxQoS0,
+                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @body_length : UInt64 = 0_u64); end
+
+   def encode_body : Bytes
+     concatenate(encode_short(@id), [@response.value])
+   end
+
+   def parse_body(buffer : Array(UInt8))
+     return unless buffer.size == 3
+     @id = (buffer[0].to_u16 << 8) + buffer[1].to_u16
+     @response = SubackResponse.new(buffer[2])
+   end
+
 
   end
 
@@ -303,7 +319,7 @@ class MqttCrystal::Packet
 
   class Disconnect < Packet
 
-  end 
+  end
 
   PACKET_TYPES = [ nil,
     Packet::Connect,
@@ -330,6 +346,13 @@ class MqttCrystal::Packet
     ServerUnavailable
     BadUserOrPass
     NotAuthorized
+  end
+
+  enum SubackResponse : UInt8
+    SuccessMaxQoS0
+    SuccessMaxQoS1
+    SuccessMaxQoS2
+    Failure = 128
   end
 end
 
