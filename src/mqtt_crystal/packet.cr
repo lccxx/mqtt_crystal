@@ -83,6 +83,17 @@ class MqttCrystal::Packet
     slice
   end
 
+  def decode_short(buffer : Array(UInt8), index : Int32) : UInt16
+    len = (buffer[index].to_u16 << 8) + buffer[index+1].to_u16
+  end
+
+  def _extract_string!(buffer : Array(UInt8), index : Int32 = 0) : String
+    len = decode_short(buffer, index)
+    result = String.new(buffer[index + 2, len])
+    buffer.delete_at(index, len + 2)
+    result
+  end
+
   def encode_string(str : String) : Bytes
     bytes = str.bytes
     size = bytes.size + 2
@@ -157,34 +168,87 @@ class MqttCrystal::Packet
   end
 
   class Connect < Packet
+
+    property clean_session, client_id, keep_alive, password, protocol_level,
+      username, will_message, will_qos, will_retain, will_topic
+
+    PROTOCOL            = "MQTT"
+    CFLAG_USERNAME      = 0x80_u8
+    CFLAG_PASSWORD      = 0x40_u8
+    CFLAG_WILL_RETAIN   = 0x20_u8
+    CFLAG_WILL          = 0x04_u8
+    CFLAG_CLEAN_SESSION = 0x02_u8
+
     def initialize(@client_id : String = UUID.random.to_s,
                    @username : String | Nil = nil,
                    @password : String | Nil = nil,
-                   @protocol_name : String = "MQTT",
                    @protocol_level : UInt8 = 0x04_u8,
                    @keep_alive : UInt16 = 15_u16,
+                   @clean_session : Bool = true,
+                   @will_retain : Bool = false,
+                   @will_topic : String | Nil = nil,
+                   @will_qos : UInt8 = 0_u8,
+                   @will_message : String | Nil = nil,
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64); end
 
     def encode_body : Bytes
-      clean_session = true
-      will_topic = nil
-      will_qos = 0_u8
-      will_retain = false
       cflags = 0_u8
-      cflags |= 0x02_u8 if clean_session
-      cflags |= 0x04_u8 unless will_topic.nil?
-      cflags |= ((will_qos & 0x03) << 3).to_u8
-      cflags |= 0x20_u8 if will_retain
-      cflags |= 0x40_u8 unless @password.nil?
-      cflags |= 0x80_u8 unless @username.nil?
-      concatenate(encode_string(@protocol_name),
+      cflags |= CFLAG_CLEAN_SESSION if @clean_session
+      cflags |= CFLAG_WILL unless @will_topic.nil?
+      cflags |= ((@will_qos & 0x03) << 3).to_u8
+      cflags |= CFLAG_WILL_RETAIN if @will_retain
+      cflags |= CFLAG_PASSWORD unless @password.nil?
+      cflags |= CFLAG_USERNAME unless @username.nil?
+      concatenate(encode_string(PROTOCOL),
                   [ @protocol_level ],
                   [ cflags ],
                   encode_short(@keep_alive),
                   encode_string(@client_id),
+                  (@will_topic ? encode_string(@will_topic.not_nil!) : Bytes.new(0)),
+                  (@will_message ? encode_string(@will_message.not_nil!) : Bytes.new(0)),
                   (@username ? encode_string(@username.not_nil!) : Bytes.new(0)),
                   (@password ? encode_string(@password.not_nil!) : Bytes.new(0)))
+    end
+
+    # byte[2..5] = 'MQTT'
+    # byte[6] = Protocol requires 4 for MQTTv3.1.1
+    # byte[7] = cflags
+    #   7 - User Name Flag - is there a username 0x80
+    #   6 - Password Flag - is there a password 0x40
+    #   5 - Will Retain 0x20 - Sould the will be retained
+    #   4 - Will QoS  0x10 - 0b10 (qos2),0b01 (qos1), 0b00 (qos0)
+    #   3 - Will QoS  0x08
+    #   2 - Will Flag 0x04 - Should there be a will message published
+    #   1 - Clean Session 0x02
+    #   0 - RESERVED (always 0) 0x00
+    # byte[8,9] = Keepalive (seconds)
+    # from ehre on
+    # 2 byte length
+    # N bytes payload, in order:
+    #   Client Identifier, Will Topic, Will Message, User Name, Password
+    def parse_body(buffer : Array(UInt8))
+      # we're going to be destructive on the buffer so clone it
+      buffer = buffer.clone
+      return nil unless PROTOCOL.bytes == buffer[2,4]
+      return nil unless buffer[6] == 4 # 4 == v3.1.1 because reasons
+
+      cflags = buffer[7]
+      @keep_alive = decode_short(buffer, 8)
+      @clean_session = cflags.bit(1).zero? ? false : true
+      @will_qos = cflags << 3 >> 6
+      @will_retain = cflags.bit(5).zero? ? false : true
+
+      # remove the first 10 items so we're up to encoded strings
+      buffer.delete_at(0,10)
+      @client_id = _extract_string!(buffer)
+      # will flag
+      if cflags.bit(2) == 1
+        @will_topic = _extract_string!(buffer)
+        @will_message = _extract_string!(buffer)
+      end
+      @username = _extract_string!(buffer) unless (cflags & CFLAG_USERNAME) == 0
+      @password = _extract_string!(buffer) unless (cflags & CFLAG_PASSWORD) == 0
     end
   end
 
