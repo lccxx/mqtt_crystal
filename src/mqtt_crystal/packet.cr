@@ -276,7 +276,10 @@ class MqttCrystal::Packet
 
   end
 
+  # repsonse to a QoS 1 PUBLISH
   class Puback < Packet
+    property id
+
     def initialize(@id : UInt16 = 0_u16,
                    @flags : Array(Bool) = [ false, false, false, false ],
                    @body_length : UInt64 = 0_u64)
@@ -288,6 +291,11 @@ class MqttCrystal::Packet
       slice[2] = (@id >> 8).to_u8
       slice[3] = @id.to_u8
       slice
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      return nil unless buffer.size == 2
+      @id = decode_short(buffer,0)
     end
   end
 
