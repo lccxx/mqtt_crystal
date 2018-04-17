@@ -129,6 +129,9 @@ describe MqttCrystal do
     MqttCrystal::Packet::Connect.new(client_id: "test1", username: "liuchong", password: "lc123789").bytes
       .should eq slice_it "\x10%\x00\x04MQTT\x04\xC2\x00\x0F\x00\x05test1\x00\bliuchong\x00\blc123789"
 
+    MqttCrystal::Packet::Connect.new(client_id: "tester", username: "yay", password: "boo", will_topic: "testy/test", will_retain: true, will_message: "Test message", will_qos: 1_u8).bytes
+      .should eq slice_it "\x10\x36\x00\x04MQTT\x04\xEE\x00\x0f\x00\x06tester\x00\ntesty/test\x00\fTest message\x00\x03yay\x00\x03boo"
+
     MqttCrystal::Packet::Connect.new(client_id: "test1").bytes
       .should eq slice_it "\x10\x11\x00\x04MQTT\x04\x02\x00\x0F\x00\x05test1"
 
@@ -137,6 +140,42 @@ describe MqttCrystal do
 
     MqttCrystal::Packet::Connect.new(client_id: "CR-79ee8b29-f2b3-4f69-9a8f-d0b3f30b849b").bytes
       .should eq slice_it "\x103\x00\x04MQTT\x04\x02\x00\x0F\x00'CR-79ee8b29-f2b3-4f69-9a8f-d0b3f30b849b"
+  end
+
+  it "connect packet recv" do
+    packet = MqttCrystal::Packet.parse("\x10\x36\x00\x04MQTT\x04\xEC\x00\x3C\x00\x06tester\x00\ntesty/test\x00\fTest message\x00\x03yay\x00\x03boo".bytes)
+    packet.should be_a MqttCrystal::Packet::Connect
+    packet = packet.as(MqttCrystal::Packet::Connect)
+    packet.client_id.should eq "tester"
+    packet.will_retain.should be_true
+    packet.will_qos.should eq 1_u8
+    packet.clean_session.should be_false
+    packet.keep_alive.should eq 60_u16
+    packet.will_topic.should eq "testy/test"
+    packet.will_message.should eq "Test message"
+    packet.username.should eq "yay"
+    packet.password.should eq "boo"
+
+    packet = MqttCrystal::Packet.parse("\x10%\x00\x04MQTT\x04\xC2\x00\x0F\x00\x05test1\x00\bliuchong\x00\blc123789".bytes)
+    packet.should be_a MqttCrystal::Packet::Connect
+    packet = packet.as(MqttCrystal::Packet::Connect)
+    packet.client_id.should eq "test1"
+    packet.username.should eq "liuchong"
+    packet.password.should eq "lc123789"
+
+    packet = MqttCrystal::Packet.parse("\x10\x11\x00\x04MQTT\x04\x02\x00\x0F\x00\x05test1".bytes)
+    packet.should be_a MqttCrystal::Packet::Connect
+    packet = packet.as(MqttCrystal::Packet::Connect)
+    packet.client_id.should eq "test1"
+    packet.username.should be_nil
+    packet.password.should be_nil
+
+    packet = MqttCrystal::Packet.parse("\x10\x12\x00\x04MQTT\x04\x02\x00\x0F\x00\x06test12".bytes)
+    packet.should be_a MqttCrystal::Packet::Connect
+    packet = packet.as(MqttCrystal::Packet::Connect)
+    packet.client_id.should eq "test12"
+    packet.username.should be_nil
+    packet.password.should be_nil
   end
 
   it "connack packet recv" do
