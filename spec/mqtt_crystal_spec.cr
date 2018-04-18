@@ -294,6 +294,18 @@ describe MqttCrystal do
     MqttCrystal::Packet::Puback.new(id: 65535_u16).bytes.should eq slice_it "@\x02\xFF\xFF"
   end
 
+  it "puback packet recv" do
+    [
+      { id: 1_u16,     as_string: "@\x02\x00\x01"},
+      { id: 455_u16,   as_string: "@\x02\x01\xC7"},
+      { id: 65535_u16, as_string: "@\x02\xFF\xFF"},
+    ].each do |params|
+      packet = MqttCrystal::Packet.parse(params["as_string"].bytes)
+      packet.should be_a MqttCrystal::Packet::Puback
+      packet = packet.as(MqttCrystal::Packet::Puback).id.should eq params["id"]
+    end
+  end
+
   it "works" do
     client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.liuchong.me")
 
