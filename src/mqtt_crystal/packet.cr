@@ -152,6 +152,15 @@ class MqttCrystal::Packet
     concatenate(header, body)
   end
 
+  module PacketWithNoPayload
+    def bytes
+      slice = Bytes.new(2)
+      slice[0] = encode_header
+      slice[1] = 0_u8
+      slice
+    end
+  end
+
   module PacketWithID
     # needed to override initialize on include
     macro included
@@ -435,23 +444,15 @@ class MqttCrystal::Packet
   end
 
   class Pingreq < Packet
-    PING_DATA = slice_it "\xC0\x00"
-
-    def bytes
-      PING_DATA
-    end
+    include PacketWithNoPayload
   end
 
   class Pingresp < Packet
-    PING_DATA = slice_it "\xD0\x00"
-
-    def bytes
-      PING_DATA
-    end
+    include PacketWithNoPayload
   end
 
   class Disconnect < Packet
-
+    include PacketWithNoPayload
   end
 
   PACKET_TYPES = [ nil,
