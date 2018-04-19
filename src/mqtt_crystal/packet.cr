@@ -1,32 +1,23 @@
 class MqttCrystal::Packet
   property flags, body_length
 
-  def self.parse(bytes : Array(UInt8)) : Packet
-    while bytes.size == 0; sleep (rand(50) + 10).milliseconds end
-    packet = create_from_header(bytes.shift)
-    return Pingresp.new if packet.nil? || !packet.validate_flags
+  def self.parse(bytes : Array(UInt8)) : Packet | Nil
+    return nil if bytes.size == 0
 
-    multiplier = 1
-    body_length = 0_u64
-    pos = 1
+    packet = Packet.create_from_header(bytes[0])
+    return nil if packet.nil? || !packet.validate_flags
 
-    while bytes.size > 0
-      digit = bytes.shift
-      body_length += ((digit & 0x7F) * multiplier)
-      multiplier *= 0x80
-      pos += 1
-      break if (digit & 0x80).zero? || pos > 4
-    end
+    remaining_length = packet.check_remaining_length(bytes[1,4])
+    return nil if 1 + remaining_length[:pos] + remaining_length[:body_length] > bytes.size
 
-    while bytes.size < body_length; sleep (rand(50) + 10).milliseconds end
-    packet.parse_body(bytes.shift(body_length))
+    bytes.shift(1 + remaining_length[:pos])
+    packet.parse_body(bytes.shift(remaining_length[:body_length]))
 
     packet
   end
 
-  def self.create_from_header(byte : UInt8 | Nil)
-    return if byte.nil?
-    type_id = ((byte & 0xF0) >> 4)
+  def self.create_from_header(byte : UInt8)
+    type_id = (byte & 0xF0) >> 4
     packet_class = Packet::PACKET_TYPES[type_id]
     return if packet_class.nil?
 
@@ -40,6 +31,21 @@ class MqttCrystal::Packet
                  @body_length : UInt64 = 0_u64); end
 
   def validate_flags; true end
+
+  def check_remaining_length(bytes : Array(UInt8)) : NamedTuple(pos: UInt8, body_length: UInt64)
+    pos = 0_u8
+    length = 0_u64
+    multiplier = 1
+
+    bytes.size.times { |i| pos += 1_u8
+      digit = bytes[i]
+      length += ((digit & 0x7F) * multiplier)
+      multiplier *= 0x80
+      break if (digit & 0x80).zero? || pos >= 4
+    }
+
+    { pos: pos, body_length: length }
+  end
 
   def type_id : Int32
     PACKET_TYPES.index(self.class).not_nil!

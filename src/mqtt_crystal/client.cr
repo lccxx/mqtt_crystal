@@ -39,19 +39,6 @@ class MqttCrystal::Client
 
     spawn do
       while !@stop
-        packet = Packet.parse(@buffer)
-        if packet.is_a?(Packet::Connack)
-          @connecting = false
-          @connected = true
-        elsif packet.is_a?(Packet::Suback)
-          @subscribed = true
-        end
-        channel.send packet
-      end
-    end
-
-    spawn do
-      while !@stop
         sleep @keep_alive.seconds
         send Packet::Pingreq.new
       end
@@ -98,6 +85,16 @@ class MqttCrystal::Client
         count = @socket.read slice
         raise "read failed" if count == 0
         count.times { |i| @buffer << slice[i] }
+
+        while packet = Packet.parse(@buffer)
+          if packet.is_a?(Packet::Connack)
+            @connecting = false
+            @connected = true
+          elsif packet.is_a?(Packet::Suback)
+            @subscribed = true
+          end
+          channel.send packet
+        end
       end
     rescue spawn_read_e
       pp spawn_read_e
