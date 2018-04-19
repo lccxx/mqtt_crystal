@@ -127,14 +127,16 @@ class MqttCrystal::Packet
     slice
   end
 
+  def encode_header : UInt8
+    ((type_id & 0x0F) << 4).to_u8 |
+      (flags[3] ? 0x8_u8 : 0x0_u8) |
+      (flags[2] ? 0x4_u8 : 0x0_u8) |
+      (flags[1] ? 0x2_u8 : 0x0_u8) |
+      (flags[0] ? 0x1_u8 : 0x0_u8)
+  end
+
   def bytes : Bytes
-    header = [
-      ((type_id & 0x0F) << 4).to_u8 |
-        (flags[3] ? 0x8_u8 : 0x0_u8) |
-        (flags[2] ? 0x4_u8 : 0x0_u8) |
-        (flags[1] ? 0x2_u8 : 0x0_u8) |
-        (flags[0] ? 0x1_u8 : 0x0_u8)
-      ]
+    header = [ encode_header ]
     body = encode_body
 
     body_length = body.size
@@ -148,6 +150,31 @@ class MqttCrystal::Packet
     end
 
     concatenate(header, body)
+  end
+
+  module PacketWithID
+    # needed to override initialize on include
+    macro included
+      def initialize(@id : UInt16 = 0_u16,
+                     @flags : Array(Bool) = [ false, false, false, false ],
+                     @body_length : UInt64 = 0_u64); end
+    end
+    property id
+
+    def bytes : Bytes
+      slice = Bytes.new(4)
+
+      slice[0] = encode_header
+      slice[1] = 2_u8
+      slice[2] = (@id >> 8).to_u8
+      slice[3] = @id.to_u8
+      slice
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      return nil unless buffer.size == 2
+      @id = decode_short(buffer,0)
+    end
   end
 
   class Publish < Packet
@@ -300,39 +327,27 @@ class MqttCrystal::Packet
 
   # repsonse to a QoS 1 PUBLISH
   class Puback < Packet
-    property id
-
-    def initialize(@id : UInt16 = 0_u16,
-                   @flags : Array(Bool) = [ false, false, false, false ],
-                   @body_length : UInt64 = 0_u64)
-    end
-
-    def bytes : Bytes
-      slice = Bytes.new(4)
-      slice[0] = 64_u8; slice[1] = 2_u8
-      slice[2] = (@id >> 8).to_u8
-      slice[3] = @id.to_u8
-      slice
-    end
-
-    def parse_body(buffer : Array(UInt8))
-      return nil unless buffer.size == 2
-      @id = decode_short(buffer,0)
-    end
+    include PacketWithID
   end
 
   class Pubrec < Packet
-
+    include PacketWithID
   end
 
   class Pubrel < Packet
+    include PacketWithID
+
+    def initialize(@id : UInt16 = 0_u16,
+                   @flags : Array(Bool) = [ false, true, false, false ],
+                   @body_length : UInt64 = 0_u64); end
+
     def validate_flags
       return flags == [ false, true, false, false ]
     end
   end
 
   class Pubcomp < Packet
-
+    include PacketWithID
   end
 
   class Subscribe < Packet
@@ -416,25 +431,7 @@ class MqttCrystal::Packet
   end
 
   class Unsuback < Packet
-    property id
-
-    def initialize(@id : UInt16 = 0_u16,
-                   @flags : Array(Bool) = [ false, false, false, false ],
-                   @body_length : UInt64 = 0_u64)
-    end
-
-    def bytes : Bytes
-      slice = Bytes.new(4)
-      slice[0] = 176_u8; slice[1] = 2_u8
-      slice[2] = (@id >> 8).to_u8
-      slice[3] = @id.to_u8
-      slice
-    end
-
-    def parse_body(buffer : Array(UInt8))
-      return nil unless buffer.size == 2
-      @id = decode_short(buffer,0)
-    end
+    include PacketWithID
   end
 
   class Pingreq < Packet
@@ -446,7 +443,11 @@ class MqttCrystal::Packet
   end
 
   class Pingresp < Packet
+    PING_DATA = slice_it "\xD0\x00"
 
+    def bytes
+      PING_DATA
+    end
   end
 
   class Disconnect < Packet
