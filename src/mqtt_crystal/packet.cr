@@ -105,6 +105,22 @@ class MqttCrystal::Packet
     slice
   end
 
+  def encode_string(strings : Array(String)) : Bytes
+    size = strings.reduce(0_u16) { |acc, str| acc + str.bytes.size + 2 }
+    slice = Bytes.new(size)
+    index = 0
+    strings.each do |str|
+      bytes = str.bytes
+      size_slice = encode_short(bytes.size.to_u16)
+      slice[index] = size_slice[0]
+      slice[index+1] = size_slice[1]
+      index += 2
+      bytes.each_with_index { |b, i| slice[index + i] = b }
+      index += bytes.size
+    end
+    slice
+  end
+
   def bytes : Bytes
     header = [
       ((type_id & 0x0F) << 4).to_u8 |
@@ -368,13 +384,51 @@ class MqttCrystal::Packet
   end
 
   class Unsubscribe < Packet
+    property id, topics
+
+    def initialize(@id : UInt16 = 0_u16,
+                   @topics : Array(String) = [] of String,
+                   @flags : Array(Bool) = [false, true, false, false],
+                   @body_length : UInt64 = 0_u64); end
+
+    def encode_body : Bytes
+      concatenate(encode_short(@id), encode_string(@topics))
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      buffer = buffer.clone
+      @id = decode_short(buffer,0)
+      buffer.delete_at(0,2)
+      while buffer.size > 0
+        @topics << _extract_string!(buffer)
+      end
+    end
+
     def validate_flags
       return flags == [ false, true, false, false ]
     end
   end
 
   class Unsuback < Packet
+    property id
 
+    def initialize(@id : UInt16 = 0_u16,
+                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @body_length : UInt64 = 0_u64)
+    end
+
+    def bytes : Bytes
+      slice = Bytes.new(4)
+      slice[0] = 176_u8; slice[1] = 2_u8
+      slice[2] = (@id >> 8).to_u8
+      slice[3] = @id.to_u8
+      slice
+    end
+
+    def parse_body(buffer : Array(UInt8))
+      return nil unless buffer.size == 2
+      @id = decode_short(buffer,0)
+    end
   end
 
   class Pingreq < Packet

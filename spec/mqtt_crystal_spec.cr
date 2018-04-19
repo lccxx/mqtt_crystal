@@ -306,6 +306,53 @@ describe MqttCrystal do
     end
   end
 
+  it "unsubscribe packet send" do
+    MqttCrystal::Packet::Unsubscribe.new(id: 1_u16, topics: %w(test/1 test/2)).bytes
+      .should eq slice_it "\xa2\x12\x00\x01\x00\x06test/1\x00\x06test/2"
+    MqttCrystal::Packet::Unsubscribe.new(id: 455_u16, topics: %w(test/1)).bytes
+      .should eq slice_it "\xa2\x0A\x01\xC7\x00\x06test/1"
+    MqttCrystal::Packet::Unsubscribe.new(id: 65535_u16, topics: %w(test/1)).bytes
+      .should eq slice_it "\xa2\x0A\xFF\xFF\x00\x06test/1"
+  end
+
+  it "unsubscribe packet recv" do
+    packet = MqttCrystal::Packet.parse("\xa2\x12\x00\x01\x00\x06test/1\x00\x06test/2".bytes)
+    packet.should be_a MqttCrystal::Packet::Unsubscribe
+    packet = packet.as MqttCrystal::Packet::Unsubscribe
+    packet.topics.should eq %w(test/1 test/2)
+    packet.id.should eq 1_u16
+
+    packet = MqttCrystal::Packet.parse("\xa2\x0A\x01\xC7\x00\x06test/1".bytes)
+    packet.should be_a MqttCrystal::Packet::Unsubscribe
+    packet = packet.as MqttCrystal::Packet::Unsubscribe
+    packet.topics.should eq %w(test/1)
+    packet.id.should eq 455_u16
+
+    packet = MqttCrystal::Packet.parse("\xa2\x0A\xFF\xFF\x00\x06test/1".bytes)
+    packet.should be_a MqttCrystal::Packet::Unsubscribe
+    packet = packet.as MqttCrystal::Packet::Unsubscribe
+    packet.topics.should eq %w(test/1)
+    packet.id.should eq 65535_u16
+  end
+
+  it "unsuback packet send" do
+    MqttCrystal::Packet::Unsuback.new(id: 1_u16).bytes.should eq slice_it "\xB0\x02\x00\x01"
+    MqttCrystal::Packet::Unsuback.new(id: 455_u16).bytes.should eq slice_it "\xB0\x02\x01\xC7"
+    MqttCrystal::Packet::Unsuback.new(id: 65535_u16).bytes.should eq slice_it "\xB0\x02\xFF\xFF"
+  end
+
+  it "unsuback packet recv" do
+    [
+      { id: 1_u16,     as_string: "\xB0\x02\x00\x01"},
+      { id: 455_u16,   as_string: "\xB0\x02\x01\xC7"},
+      { id: 65535_u16, as_string: "\xB0\x02\xFF\xFF"},
+    ].each do |params|
+      packet = MqttCrystal::Packet.parse(params["as_string"].bytes)
+      packet.should be_a MqttCrystal::Packet::Unsuback
+      packet = packet.as(MqttCrystal::Packet::Unsuback).id.should eq params["id"]
+    end
+  end
+
   it "works" do
     client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.liuchong.me")
 
