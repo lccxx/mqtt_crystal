@@ -306,6 +306,60 @@ describe MqttCrystal do
     end
   end
 
+  it "pubrec packet send" do
+    MqttCrystal::Packet::Pubrec.new(id: 1_u16).bytes.should eq slice_it "\x50\x02\x00\x01"
+    MqttCrystal::Packet::Pubrec.new(id: 455_u16).bytes.should eq slice_it "\x50\x02\x01\xC7"
+    MqttCrystal::Packet::Pubrec.new(id: 65535_u16).bytes.should eq slice_it "\x50\x02\xFF\xFF"
+  end
+
+  it "pubrec packet recv" do
+    [
+      { id: 1_u16,     as_string: "\x50\x02\x00\x01"},
+      { id: 455_u16,   as_string: "\x50\x02\x01\xC7"},
+      { id: 65535_u16, as_string: "\x50\x02\xFF\xFF"},
+    ].each do |params|
+      packet = MqttCrystal::Packet.parse(params["as_string"].bytes)
+      packet.should be_a MqttCrystal::Packet::Pubrec
+      packet = packet.as(MqttCrystal::Packet::Pubrec).id.should eq params["id"]
+    end
+  end
+
+  it "pubrel packet send" do
+    MqttCrystal::Packet::Pubrel.new(id: 1_u16).bytes.should eq slice_it "\x62\x02\x00\x01"
+    MqttCrystal::Packet::Pubrel.new(id: 455_u16).bytes.should eq slice_it "\x62\x02\x01\xC7"
+    MqttCrystal::Packet::Pubrel.new(id: 65535_u16).bytes.should eq slice_it "\x62\x02\xFF\xFF"
+  end
+
+  it "pubrel packet recv" do
+    [
+      { id: 1_u16,     as_string: "\x62\x02\x00\x01"},
+      { id: 455_u16,   as_string: "\x62\x02\x01\xC7"},
+      { id: 65535_u16, as_string: "\x62\x02\xFF\xFF"},
+    ].each do |params|
+      packet = MqttCrystal::Packet.parse(params["as_string"].bytes)
+      packet.should be_a MqttCrystal::Packet::Pubrel
+      packet = packet.as(MqttCrystal::Packet::Pubrel).id.should eq params["id"]
+    end
+  end
+
+  it "pubcomp packet send" do
+    MqttCrystal::Packet::Pubcomp.new(id: 1_u16).bytes.should eq slice_it "\x70\x02\x00\x01"
+    MqttCrystal::Packet::Pubcomp.new(id: 455_u16).bytes.should eq slice_it "\x70\x02\x01\xC7"
+    MqttCrystal::Packet::Pubcomp.new(id: 65535_u16).bytes.should eq slice_it "\x70\x02\xFF\xFF"
+  end
+
+  it "pubcomp packet recv" do
+    [
+      { id: 1_u16,     as_string: "\x70\x02\x00\x01"},
+      { id: 455_u16,   as_string: "\x70\x02\x01\xC7"},
+      { id: 65535_u16, as_string: "\x70\x02\xFF\xFF"},
+    ].each do |params|
+      packet = MqttCrystal::Packet.parse(params["as_string"].bytes)
+      packet.should be_a MqttCrystal::Packet::Pubcomp
+      packet = packet.as(MqttCrystal::Packet::Pubcomp).id.should eq params["id"]
+    end
+  end
+
   it "unsubscribe packet send" do
     MqttCrystal::Packet::Unsubscribe.new(id: 1_u16, topics: %w(test/1 test/2)).bytes
       .should eq slice_it "\xa2\x12\x00\x01\x00\x06test/1\x00\x06test/2"
