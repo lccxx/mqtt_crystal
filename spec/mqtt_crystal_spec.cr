@@ -410,7 +410,7 @@ describe MqttCrystal do
   it "works" do
     client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "iot.liuchong.me")
 
-    topic, payload = "pub/#{client.id}/test", rand.to_s
+    topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
 
     publish_count = 7
     publish_max_wait = 200

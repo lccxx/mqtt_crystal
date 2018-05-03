@@ -38,7 +38,7 @@ class MqttCrystal::Packet
     multiplier = 1
 
     bytes.size.times { |i| pos += 1_u8
-      digit = bytes[i]
+      digit = bytes[i].to_i32
       length += ((digit & 0x7F) * multiplier)
       multiplier *= 0x80
       break if (digit & 0x80).zero? || pos >= 4
