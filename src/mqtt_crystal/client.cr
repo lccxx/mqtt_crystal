@@ -133,6 +133,7 @@ class MqttCrystal::Client
   end
 
   def publish(topic : String, payload : String)
+    connect unless @connected
     send Packet::Publish.new(id: next_packet_id, qos: 1_u8, topic: topic, payload: payload)
   end
 
