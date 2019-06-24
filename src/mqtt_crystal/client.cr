@@ -4,10 +4,10 @@ require "socket"
 
 class MqttCrystal::Client
   DEFAULT_SOCKET_ARGS = {
-    family: Socket::Family::INET,
-    type: Socket::Type::STREAM,
+    family:   Socket::Family::INET,
+    type:     Socket::Type::STREAM,
     protocol: Socket::Protocol::TCP,
-    blocking: false
+    blocking: false,
   }
 
   property id, host, port, username, password, keep_alive, socket, channel, next_packet_id
@@ -64,7 +64,7 @@ class MqttCrystal::Client
     connect if !@connected
 
     @topics << topic
-    subscribe([ topic ])
+    subscribe([topic])
   end
 
   def subscribe(topics : Array(String)) : self
@@ -99,9 +99,9 @@ class MqttCrystal::Client
     rescue spawn_read_e
       pp spawn_read_e
       reconnect
-    end 
+    end
 
-    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes 
+    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
 
     self
   rescue connect_e
@@ -122,7 +122,10 @@ class MqttCrystal::Client
   def reconnect : self
     return self if !@auto_reconnect
     @connecting = @connected = @subscribed = false
-    begin; @socket.close; rescue e; end
+    begin
+      @socket.close
+    rescue e
+    end
     sleep 1
     @id = "s-#{UUID.random.to_s}"
     @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
@@ -139,15 +142,23 @@ class MqttCrystal::Client
 
   def send(packet : Packet)
     return if @stop
-    while !@stop && !@connected; sleep 0.5 end
+    while !@stop && !@connected
+      sleep 0.5
+    end
     socket.write packet.bytes
   end
 
-  def next_packet_id; @next_packet_id += 1 end
+  def next_packet_id
+    @next_packet_id += 1
+  end
 
-  def connected?; @connected end
+  def connected?
+    @connected
+  end
 
-  def subscribed?; @subscribed end
+  def subscribed?
+    @subscribed
+  end
 
   def close
     @stop = true
