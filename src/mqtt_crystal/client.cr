@@ -1,19 +1,20 @@
 require "uuid"
 require "uri"
 require "socket"
+require "openssl"
 
 class MqttCrystal::Client
-  DEFAULT_SOCKET_ARGS = {
-    family:   Socket::Family::INET,
-    type:     Socket::Type::STREAM,
-    protocol: Socket::Protocol::TCP,
-    blocking: false,
-  }
+  private abstract class SocketLike
+    abstract def connect(host : String, port : UInt16)
+    abstract def read(slice : Bytes)
+    abstract def write(slice : Bytes)
+    abstract def close
+  end
 
   property id, host, port, username, password
 
+  @socket : SocketLike
   @topics = Array(String).new
-  @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
   @channel = Channel(Packet).new
   @next_packet_id = 0_u16
   @connecting = false
@@ -32,7 +33,8 @@ class MqttCrystal::Client
                  url : String | Nil = nil,
                  id : String | Nil = nil,
                  keep_alive : UInt16 = 15_u16,
-                 @auto_reconnect : Bool = true)
+                 @auto_reconnect : Bool = true,
+                 @tls : Bool = false)
     if url
       uri = URI.parse url.not_nil!
       @host = uri.host.not_nil! if uri.host
@@ -41,6 +43,7 @@ class MqttCrystal::Client
       @password = uri.password
     end
 
+    @socket = @tls ? TlsSocket.new : RegularSocket.new
     @random_id = id.nil?
     @id = id || "s-#{UUID.random.to_s}"
 
@@ -133,7 +136,7 @@ class MqttCrystal::Client
     end
     sleep 1
     @id = "s-#{UUID.random.to_s}" if @random_id
-    @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
+    @socket = @tls ? TlsSocket.new : RegularSocket.new
     connect
     subscribe @topics
 
@@ -170,5 +173,60 @@ class MqttCrystal::Client
     @connected = false
     @channel.close
     @socket.close
+  end
+
+  DEFAULT_SOCKET_ARGS = {
+    family:   Socket::Family::INET,
+    type:     Socket::Type::STREAM,
+    protocol: Socket::Protocol::TCP,
+    blocking: false,
+  }
+
+  private class RegularSocket < SocketLike
+    def initialize
+      @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
+    end
+
+    def connect(host : String, port : UInt16)
+      @socket.connect(host, port)
+    end
+
+    def read(*args)
+      @socket.read *args
+    end
+
+    def write(*args)
+      @socket.write *args
+    end
+
+    def close
+      @socket.close
+    end
+  end
+
+  private class TlsSocket < SocketLike
+    @tls_socket : OpenSSL::SSL::Socket::Client | Nil = nil
+
+    def initialize
+      @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
+    end
+
+    def connect(host : String, port : UInt16)
+      @socket.connect(host, port)
+      ctx = OpenSSL::SSL::Context::Client.new
+      @tls_socket = OpenSSL::SSL::Socket::Client.new(@socket, ctx)
+    end
+
+    def read(*args)
+      @tls_socket.not_nil!.unbuffered_read *args
+    end
+
+    def write(*args)
+      @tls_socket.not_nil!.unbuffered_write *args
+    end
+
+    def close
+      @tls_socket.not_nil!.close
+    end
   end
 end
