@@ -61,15 +61,13 @@ class MqttCrystal::Client
   end
 
   def subscribe(topic : String) : self
-    connect if !@connected
-
-    @topics << topic
     subscribe([topic])
   end
 
   def subscribe(topics : Array(String)) : self
+    connect unless @connected
+    @topics += topics
     topics.each { |topic| send Packet::Subscribe.new(id: next_packet_id, topic: topic) }
-
     self
   end
 
