@@ -12,25 +12,26 @@ class MqttCrystal::Client
 
   property id, host, port, username, password, keep_alive, socket, channel, next_packet_id
 
+  @topics = Array(String).new
+  @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
+  @channel = Channel(Packet).new
+  @next_packet_id = 0_u16
+  @connecting = false
+  @connected = false
+  @subscribed = false
+  @stop = false
+  @buffer = Array(UInt8).new
+
   def initialize(@id : String = "s-#{UUID.random.to_s}",
                  @host : String = "127.0.0.1",
                  @port : UInt16 = 1883_u16,
                  @username : String | Nil = nil,
                  @password : String | Nil = nil,
-                 @url : String | Nil = nil,
-                 @keep_alive : UInt16 = 15_u16,
-                 @auto_reconnect : Bool = true,
-                 @topics : Array(String) = Array(String).new,
-                 @socket : Socket = Socket.new(**DEFAULT_SOCKET_ARGS),
-                 @channel : Channel(Packet) = Channel(Packet).new,
-                 @next_packet_id : UInt16 = 0_u16,
-                 @connecting : Bool = false,
-                 @connected : Bool = false,
-                 @subscribed : Bool = false,
-                 @stop : Bool = false,
-                 @buffer : Array(UInt8) = Array(UInt8).new)
-    if @url
-      uri = URI.parse @url.not_nil!
+                 url : String | Nil = nil,
+                 keep_alive : UInt16 = 15_u16,
+                 @auto_reconnect : Bool = true)
+    if url
+      uri = URI.parse url.not_nil!
       @host = uri.host.not_nil! if uri.host
       @port = uri.port.not_nil!.to_u16 if uri.port
       @username = uri.user
@@ -39,7 +40,7 @@ class MqttCrystal::Client
 
     spawn do
       while !@stop
-        sleep @keep_alive.seconds
+        sleep keep_alive.seconds
         send Packet::Pingreq.new
       end
     end
