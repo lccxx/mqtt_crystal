@@ -68,7 +68,7 @@ class MqttCrystal::Client
   end
 
   def subscribe(topics : Array(String)) : self
-    topics.each { |topic| send Packet::Subscribe.new(topic: topic) }
+    topics.each { |topic| send Packet::Subscribe.new(id: next_packet_id, topic: topic) }
 
     self
   end
