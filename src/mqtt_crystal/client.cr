@@ -10,7 +10,7 @@ class MqttCrystal::Client
     blocking: false,
   }
 
-  property id, host, port, username, password, keep_alive, socket, channel, next_packet_id
+  property id, host, port, username, password
 
   @topics = Array(String).new
   @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
@@ -55,7 +55,7 @@ class MqttCrystal::Client
   def get(topic : String)
     subscribe topic
     while !@stop
-      packet = channel.receive
+      packet = @channel.receive
       if packet.is_a?(Packet::Publish)
         packet = packet.as(Packet::Publish)
         yield(packet.topic, packet.payload)
@@ -98,7 +98,7 @@ class MqttCrystal::Client
           elsif packet.is_a?(Packet::Suback)
             @subscribed = true
           end
-          channel.send packet
+          @channel.send packet
         end
       end
     rescue spawn_read_e
@@ -106,7 +106,7 @@ class MqttCrystal::Client
       reconnect
     end
 
-    socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
+    @socket.write Packet::Connect.new(client_id: @id, username: @username, password: @password).bytes
 
     self
   rescue connect_e
@@ -145,15 +145,15 @@ class MqttCrystal::Client
     send Packet::Publish.new(id: next_packet_id, qos: 1_u8, topic: topic, payload: payload)
   end
 
-  def send(packet : Packet)
+  private def send(packet : Packet)
     return if @stop
     while !@stop && !@connected
       sleep 0.5
     end
-    socket.write packet.bytes
+    @socket.write packet.bytes
   end
 
-  def next_packet_id
+  private def next_packet_id
     @next_packet_id += 1
   end
 
