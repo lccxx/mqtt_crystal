@@ -22,12 +22,15 @@ class MqttCrystal::Client
   @stop = false
   @buffer = Array(UInt8).new
 
-  def initialize(@id : String = "s-#{UUID.random.to_s}",
-                 @host : String = "127.0.0.1",
+  @id : String
+  @random_id = true
+
+  def initialize(@host : String = "127.0.0.1",
                  @port : UInt16 = 1883_u16,
                  @username : String | Nil = nil,
                  @password : String | Nil = nil,
                  url : String | Nil = nil,
+                 id : String | Nil = nil,
                  keep_alive : UInt16 = 15_u16,
                  @auto_reconnect : Bool = true)
     if url
@@ -37,6 +40,9 @@ class MqttCrystal::Client
       @username = uri.user
       @password = uri.password
     end
+
+    @random_id = id.nil?
+    @id = id || "s-#{UUID.random.to_s}"
 
     spawn do
       while !@stop
@@ -126,7 +132,7 @@ class MqttCrystal::Client
     rescue e
     end
     sleep 1
-    @id = "s-#{UUID.random.to_s}"
+    @id = "s-#{UUID.random.to_s}" if @random_id
     @socket = Socket.new(**DEFAULT_SOCKET_ARGS)
     connect
     subscribe @topics
