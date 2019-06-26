@@ -421,7 +421,10 @@ describe MqttCrystal do
         ready.send true
         # Cleanup mosquitto after test finishes
         done.receive
-        p.kill
+        begin
+          p.kill
+        rescue
+        end
       }
     end
 
