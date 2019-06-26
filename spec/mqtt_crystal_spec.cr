@@ -412,12 +412,16 @@ describe MqttCrystal do
     config << "allow_anonymous true"
 
     ready = Channel(Bool).new
+    done = Channel(Bool).new
     spawn do
       Process.run("mosquitto", ["-c", config.path], input: Process::Redirect::Close) { |p|
         loop {
           break if p.error.read_line.includes? "on port 1883"
         }
         ready.send true
+        # Cleanup mosquitto after test finishes
+        done.receive
+        p.kill
       }
     end
 
@@ -462,6 +466,7 @@ describe MqttCrystal do
       end
     }
 
+    done.send true
     config.delete
   end
 
