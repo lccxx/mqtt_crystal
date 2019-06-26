@@ -449,10 +449,10 @@ describe MqttCrystal do
     spawn {
       sleep (subscribed_max_wait * subscribed_wait_count +
              publish_max_wait * publish_count * 7 + 2000).milliseconds
-      it "wait too long" {
-        client.close
-        false.should eq true
-      }
+      client.close
+      done.send true
+      config.delete
+      fail "waited too long"
     }
 
     get_count = 0
