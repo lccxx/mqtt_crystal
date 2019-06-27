@@ -55,8 +55,7 @@ class MqttCrystal::Client
     end
   end
 
-  def get(topic : String)
-    subscribe topic
+  def listen(&block)
     while !@stop
       packet = @channel.receive
       if packet.is_a?(Packet::Publish)
@@ -65,6 +64,11 @@ class MqttCrystal::Client
         send Packet::Puback.new(id: packet.id) if packet.qos > 0
       end
     end
+  end
+
+  def get(topic : String)
+    subscribe topic
+    listen { |topic, payload| yield topic, payload }
   rescue e
     return self if @stop
     puts "get failed #{e}"
