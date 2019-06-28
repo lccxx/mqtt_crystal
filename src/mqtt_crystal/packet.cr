@@ -7,7 +7,7 @@ class MqttCrystal::Packet
     packet = Packet.create_from_header(bytes[0])
     return nil if packet.nil? || !packet.validate_flags
 
-    remaining_length = packet.check_remaining_length(bytes[1,4])
+    remaining_length = packet.check_remaining_length(bytes[1, 4])
     return nil if 1 + remaining_length[:pos] + remaining_length[:body_length] > bytes.size
 
     bytes.shift(1 + remaining_length[:pos])
@@ -21,16 +21,18 @@ class MqttCrystal::Packet
     packet_class = Packet::PACKET_TYPES[type_id]
     return if packet_class.nil?
 
-    flags = Array(Bool).new()
+    flags = Array(Bool).new
     4.times { |i| flags << (byte & (1_u8 << i) != 0_u8) }
 
     packet_class.new(flags: flags)
   end
 
-  def initialize(@flags : Array(Bool) = [ false, false, false, false ],
+  def initialize(@flags : Array(Bool) = [false, false, false, false],
                  @body_length : UInt64 = 0_u64); end
 
-  def validate_flags; true end
+  def validate_flags
+    true
+  end
 
   def check_remaining_length(bytes : Array(UInt8)) : NamedTuple(pos: UInt8, body_length: UInt64)
     pos = 0_u8
@@ -38,13 +40,12 @@ class MqttCrystal::Packet
     multiplier = 1
 
     bytes.size.times { |i| pos += 1_u8
-      digit = bytes[i].to_i32
-      length += ((digit & 0x7F) * multiplier)
-      multiplier *= 0x80
-      break if (digit & 0x80).zero? || pos >= 4
-    }
+    digit = bytes[i].to_i32
+    length += ((digit & 0x7F) * multiplier)
+    multiplier *= 0x80
+    break if (digit & 0x80).zero? || pos >= 4 }
 
-    { pos: pos, body_length: length }
+    {pos: pos, body_length: length}
   end
 
   def type_id : Int32
@@ -52,7 +53,6 @@ class MqttCrystal::Packet
   end
 
   def parse_body(buffer : Array(UInt8))
-
   end
 
   def encode_body : Bytes
@@ -69,7 +69,7 @@ class MqttCrystal::Packet
 
   def self.slice_it(a : Array(UInt8)) : Bytes
     slice = Bytes.new a.size
-    a.map_with_index { |b ,i| slice[i] = b }
+    a.map_with_index { |b, i| slice[i] = b }
     slice
   end
 
@@ -90,7 +90,7 @@ class MqttCrystal::Packet
   end
 
   def decode_short(buffer : Array(UInt8), index : Int32) : UInt16
-    len = (buffer[index].to_u16 << 8) + buffer[index+1].to_u16
+    len = (buffer[index].to_u16 << 8) + buffer[index + 1].to_u16
   end
 
   def _extract_string!(buffer : Array(UInt8), index : Int32 = 0) : String
@@ -119,7 +119,7 @@ class MqttCrystal::Packet
       bytes = str.bytes
       size_slice = encode_short(bytes.size.to_u16)
       slice[index] = size_slice[0]
-      slice[index+1] = size_slice[1]
+      slice[index + 1] = size_slice[1]
       index += 2
       bytes.each_with_index { |b, i| slice[index + i] = b }
       index += bytes.size
@@ -136,7 +136,7 @@ class MqttCrystal::Packet
   end
 
   def bytes : Bytes
-    header = [ encode_header ]
+    header = [encode_header]
     body = encode_body
 
     body_length = body.size
@@ -168,6 +168,7 @@ class MqttCrystal::Packet
                      @flags : Array(Bool) = [ false, false, false, false ],
                      @body_length : UInt64 = 0_u64); end
     end
+
     property id
 
     def bytes : Bytes
@@ -182,7 +183,7 @@ class MqttCrystal::Packet
 
     def parse_body(buffer : Array(UInt8))
       return nil unless buffer.size == 2
-      @id = decode_short(buffer,0)
+      @id = decode_short(buffer, 0)
     end
   end
 
@@ -191,16 +192,21 @@ class MqttCrystal::Packet
 
     def initialize(@topic : String = "pub/test",
                    @payload : String = "test",
+                   @retain : Bool = false,
                    @id : UInt16 = 0_u16,
                    @qos : UInt8 = 0_u8,
-                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @flags : Array(Bool) = [false, false, false, false],
                    @body_length : UInt64 = 0_u64)
       if @qos != 0
         @flags[1] = (@qos & 0x01 == 0x01)
         @flags[2] = (@qos & 0x02 == 0x02)
       end
-      if @flags != [ false, false, false, false ]
+      if @retain
+        @flags[0] = @retain
+      end
+      if @flags != [false, false, false, false]
         @qos = (@flags[1] ? 0x01_u8 : 0x00_u8) | (@flags[2] ? 0x02_u8 : 0x00_u8)
+        @retain = @flags[0]
       end
     end
 
@@ -226,7 +232,6 @@ class MqttCrystal::Packet
   end
 
   class Connect < Packet
-
     property clean_session, client_id, keep_alive, password, protocol_level,
       username, will_message, will_qos, will_retain, will_topic
 
@@ -247,7 +252,7 @@ class MqttCrystal::Packet
                    @will_topic : String | Nil = nil,
                    @will_qos : UInt8 = 0_u8,
                    @will_message : String | Nil = nil,
-                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @flags : Array(Bool) = [false, false, false, false],
                    @body_length : UInt64 = 0_u64); end
 
     def encode_body : Bytes
@@ -259,14 +264,14 @@ class MqttCrystal::Packet
       cflags |= CFLAG_PASSWORD unless @password.nil?
       cflags |= CFLAG_USERNAME unless @username.nil?
       concatenate(encode_string(PROTOCOL),
-                  [ @protocol_level ],
-                  [ cflags ],
-                  encode_short(@keep_alive),
-                  encode_string(@client_id),
-                  (@will_topic ? encode_string(@will_topic.not_nil!) : Bytes.new(0)),
-                  (@will_message ? encode_string(@will_message.not_nil!) : Bytes.new(0)),
-                  (@username ? encode_string(@username.not_nil!) : Bytes.new(0)),
-                  (@password ? encode_string(@password.not_nil!) : Bytes.new(0)))
+        [@protocol_level],
+        [cflags],
+        encode_short(@keep_alive),
+        encode_string(@client_id),
+        (@will_topic ? encode_string(@will_topic.not_nil!) : Bytes.new(0)),
+        (@will_message ? encode_string(@will_message.not_nil!) : Bytes.new(0)),
+        (@username ? encode_string(@username.not_nil!) : Bytes.new(0)),
+        (@password ? encode_string(@password.not_nil!) : Bytes.new(0)))
     end
 
     # byte[2..5] = 'MQTT'
@@ -288,7 +293,7 @@ class MqttCrystal::Packet
     def parse_body(buffer : Array(UInt8))
       # we're going to be destructive on the buffer so clone it
       buffer = buffer.clone
-      return nil unless PROTOCOL.bytes == buffer[2,4]
+      return nil unless PROTOCOL.bytes == buffer[2, 4]
       return nil unless buffer[6] == 4 # 4 == v3.1.1 because reasons
 
       cflags = buffer[7]
@@ -298,7 +303,7 @@ class MqttCrystal::Packet
       @will_retain = cflags.bit(5).zero? ? false : true
 
       # remove the first 10 items so we're up to encoded strings
-      buffer.delete_at(0,10)
+      buffer.delete_at(0, 10)
       @client_id = _extract_string!(buffer)
       # will flag
       if cflags.bit(2) == 1
@@ -317,7 +322,7 @@ class MqttCrystal::Packet
     # otherwise up to the implementation to decide if the session exists
     def initialize(@session_present = false,
                    @response = ConnackResponse::Accepted,
-                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @flags : Array(Bool) = [false, false, false, false],
                    @body_length : UInt64 = 0_u64); end
 
     def encode_body : Bytes
@@ -331,7 +336,6 @@ class MqttCrystal::Packet
       @session_present = buffer[0] == 1 ? true : false
       @response = ConnackResponse.new(buffer[1])
     end
-
   end
 
   # repsonse to a QoS 1 PUBLISH
@@ -347,11 +351,11 @@ class MqttCrystal::Packet
     include PacketWithID
 
     def initialize(@id : UInt16 = 0_u16,
-                   @flags : Array(Bool) = [ false, true, false, false ],
+                   @flags : Array(Bool) = [false, true, false, false],
                    @body_length : UInt64 = 0_u64); end
 
     def validate_flags
-      return flags == [ false, true, false, false ]
+      return flags == [false, true, false, false]
     end
   end
 
@@ -365,11 +369,11 @@ class MqttCrystal::Packet
     def initialize(@id : UInt16 = 0_u16,
                    @topic : String = "pub/test",
                    @qos : UInt8 = 1_u8,
-                   @flags : Array(Bool) = [ false, true, false, false ],
+                   @flags : Array(Bool) = [false, true, false, false],
                    @body_length : UInt64 = 0_u64); end
 
     def validate_flags
-      return flags == [ false, true, false, false ]
+      return flags == [false, true, false, false]
     end
 
     # Varialble Header
@@ -380,7 +384,7 @@ class MqttCrystal::Packet
     # 1 byte = qos
 
     def encode_body : Bytes
-      concatenate(encode_short(@id), encode_string(@topic), [ @qos ])
+      concatenate(encode_short(@id), encode_string(@topic), [@qos])
     end
 
     def parse_body(buffer : Array(UInt8))
@@ -395,22 +399,21 @@ class MqttCrystal::Packet
 
   class Suback < Packet
     property id, response
+
     def initialize(@id : UInt16 = 0_u16,
                    @response = SubackResponse::SuccessMaxQoS0,
-                   @flags : Array(Bool) = [ false, false, false, false ],
+                   @flags : Array(Bool) = [false, false, false, false],
                    @body_length : UInt64 = 0_u64); end
 
-   def encode_body : Bytes
-     concatenate(encode_short(@id), [@response.value])
-   end
+    def encode_body : Bytes
+      concatenate(encode_short(@id), [@response.value])
+    end
 
-   def parse_body(buffer : Array(UInt8))
-     return unless buffer.size == 3
-     @id = (buffer[0].to_u16 << 8) + buffer[1].to_u16
-     @response = SubackResponse.new(buffer[2])
-   end
-
-
+    def parse_body(buffer : Array(UInt8))
+      return unless buffer.size == 3
+      @id = (buffer[0].to_u16 << 8) + buffer[1].to_u16
+      @response = SubackResponse.new(buffer[2])
+    end
   end
 
   class Unsubscribe < Packet
@@ -427,15 +430,15 @@ class MqttCrystal::Packet
 
     def parse_body(buffer : Array(UInt8))
       buffer = buffer.clone
-      @id = decode_short(buffer,0)
-      buffer.delete_at(0,2)
+      @id = decode_short(buffer, 0)
+      buffer.delete_at(0, 2)
       while buffer.size > 0
         @topics << _extract_string!(buffer)
       end
     end
 
     def validate_flags
-      return flags == [ false, true, false, false ]
+      return flags == [false, true, false, false]
     end
   end
 
@@ -455,22 +458,22 @@ class MqttCrystal::Packet
     include PacketWithNoPayload
   end
 
-  PACKET_TYPES = [ nil,
-    Packet::Connect,
-    Packet::Connack,
-    Packet::Publish,
-    Packet::Puback,
-    Packet::Pubrec,
-    Packet::Pubrel,
-    Packet::Pubcomp,
-    Packet::Subscribe,
-    Packet::Suback,
-    Packet::Unsubscribe,
-    Packet::Unsuback,
-    Packet::Pingreq,
-    Packet::Pingresp,
-    Packet::Disconnect,
-    nil
+  PACKET_TYPES = [nil,
+                  Packet::Connect,
+                  Packet::Connack,
+                  Packet::Publish,
+                  Packet::Puback,
+                  Packet::Pubrec,
+                  Packet::Pubrel,
+                  Packet::Pubcomp,
+                  Packet::Subscribe,
+                  Packet::Suback,
+                  Packet::Unsubscribe,
+                  Packet::Unsuback,
+                  Packet::Pingreq,
+                  Packet::Pingresp,
+                  Packet::Disconnect,
+                  nil,
   ]
 
   enum ConnackResponse : UInt8
@@ -486,7 +489,7 @@ class MqttCrystal::Packet
     SuccessMaxQoS0
     SuccessMaxQoS1
     SuccessMaxQoS2
-    Failure = 128
+    Failure        = 128
   end
 end
 

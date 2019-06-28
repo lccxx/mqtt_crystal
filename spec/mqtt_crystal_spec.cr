@@ -473,6 +473,59 @@ describe MqttCrystal do
     config.delete
   end
 
+  it "publishes with retain" do
+    config = File.tempfile("mosquitto.conf")
+    config << "port 1883"
+    config << "allow_anonymous true"
+
+    ready = Channel(Bool).new
+    done = Channel(Bool).new
+    spawn do
+      Process.run("mosquitto", ["-c", config.path], input: Process::Redirect::Close) { |p|
+        loop {
+          break if p.error.read_line.includes? "on port 1883"
+        }
+        ready.send true
+        # Cleanup mosquitto after test finishes
+        done.receive
+        begin
+          p.kill
+        rescue
+        end
+      }
+    end
+
+    ready.receive
+    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "127.0.0.1")
+
+    topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
+
+    publish_count = 7
+    publish_max_wait = 200
+    subscribed_max_wait = 10
+    subscribed_wait_count = 0
+
+    client.publish topic, payload, retain: true
+
+    spawn {
+      sleep 15.seconds
+      client.close
+      done.send true
+      config.delete
+      fail "waited too long"
+    }
+
+    client.get(topic) { |t, m|
+      t.should eq topic
+      m.should eq payload
+      client.close
+      client.connected?.should eq false
+    }
+
+    done.send true
+    config.delete
+  end
+
   it "mqtt connect url" do
     client = MqttCrystal::Client.new(url: "mqtt://172.17.0.1")
     client.host.should eq "172.17.0.1"
