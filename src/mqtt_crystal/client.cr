@@ -14,12 +14,13 @@ class MqttCrystal::Client
   property id, host, port, username, password
 
   @socket : SocketLike
-  @topics = Array(String).new
+  @topics = Set(String).new
   @channel = Channel(Packet).new
   @next_packet_id = 0_u16
   @connecting = false
   @connected = false
-  @subscribed = false
+  @sub_ids = Hash(UInt16, String).new
+  @subscribed = Set(String).new
   @stop = false
   @buffer = Array(UInt8).new
 
@@ -55,36 +56,6 @@ class MqttCrystal::Client
     end
   end
 
-  def listen(&block)
-    while !@stop
-      packet = @channel.receive
-      if packet.is_a?(Packet::Publish)
-        packet = packet.as(Packet::Publish)
-        yield(packet.topic, packet.payload)
-        send Packet::Puback.new(id: packet.id) if packet.qos > 0
-      end
-    end
-  end
-
-  def get(topic : String)
-    subscribe topic
-    listen { |topic, payload| yield topic, payload }
-  rescue e
-    return self if @stop
-    puts "get failed #{e}"
-  end
-
-  def subscribe(topic : String) : self
-    subscribe([topic])
-  end
-
-  def subscribe(topics : Array(String)) : self
-    connect unless @connected
-    @topics += topics
-    topics.each { |topic| send Packet::Subscribe.new(id: next_packet_id, topic: topic) }
-    self
-  end
-
   def connect : self
     return self if @connecting || @connected || @stop
     @connecting = true
@@ -103,7 +74,10 @@ class MqttCrystal::Client
             @connecting = false
             @connected = true
           elsif packet.is_a?(Packet::Suback)
-            @subscribed = true
+            packet = packet.as(Packet::Suback)
+            if topic = @sub_ids.delete(packet.id)
+              @subscribed << topic
+            end
           end
           @channel.send packet
         end
@@ -131,9 +105,56 @@ class MqttCrystal::Client
     end
   end
 
-  def reconnect : self
+  def connected?
+    @connected
+  end
+
+  def subscribe(topic : String) : self
+    subscribe([topic])
+  end
+
+  def subscribe(topics : Enumerable(String)) : self
+    connect unless @connected
+    @topics.concat topics
+    topics.each do |topic|
+      id = next_packet_id
+      @sub_ids[id] = topic
+      send Packet::Subscribe.new(id: id, topic: topic)
+    end
+    self
+  end
+
+  def subscribed?(topic)
+    @subscribed.includes? topic
+  end
+
+  def receive : Tuple(String, String)
+    while packet = @channel.receive
+      if packet.is_a?(Packet::Publish)
+        packet = packet.as(Packet::Publish)
+        send Packet::Puback.new(id: packet.id) if packet.qos > 0
+        return packet.topic, packet.payload
+      end
+    end
+    raise IO::EOFError.new("No more messages from broker")
+  end
+
+  def publish(topic : String, payload : String, qos : UInt8 = 1_u8, retain : Bool = false)
+    connect unless @connected
+    send Packet::Publish.new(id: next_packet_id, qos: qos, retain: retain, topic: topic, payload: payload)
+  end
+
+  def close
+    @stop = true
+    @connected = false
+    @channel.close
+    @socket.close
+  end
+
+  private def reconnect : self
     return self if !@auto_reconnect
-    @connecting = @connected = @subscribed = false
+    @connecting = @connected = false
+    @subscribed.clear
     begin
       @socket.close
     rescue e
@@ -147,11 +168,6 @@ class MqttCrystal::Client
     self
   end
 
-  def publish(topic : String, payload : String, qos : UInt8 = 1_u8, retain : Bool = false)
-    connect unless @connected
-    send Packet::Publish.new(id: next_packet_id, qos: qos, retain: retain, topic: topic, payload: payload)
-  end
-
   private def send(packet : Packet)
     return if @stop
     while !@stop && !@connected
@@ -162,21 +178,6 @@ class MqttCrystal::Client
 
   private def next_packet_id
     @next_packet_id += 1
-  end
-
-  def connected?
-    @connected
-  end
-
-  def subscribed?
-    @subscribed
-  end
-
-  def close
-    @stop = true
-    @connected = false
-    @channel.close
-    @socket.close
   end
 
   DEFAULT_SOCKET_ARGS = {

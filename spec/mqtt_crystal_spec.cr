@@ -407,123 +407,64 @@ describe MqttCrystal do
   end
 
   it "works" do
-    config = File.tempfile("mosquitto.conf")
-    config << "port 1883"
-    config << "allow_anonymous true"
+    with_mosquitto do
+      client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "127.0.0.1")
 
-    ready = Channel(Bool).new
-    done = Channel(Bool).new
-    spawn do
-      Process.run("mosquitto", ["-c", config.path], input: Process::Redirect::Close) { |p|
-        loop {
-          break if p.error.read_line.includes? "on port 1883"
-        }
-        ready.send true
-        # Cleanup mosquitto after test finishes
-        done.receive
-        begin
-          p.kill
-        rescue
+      topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
+
+      publish_count = 7
+      publish_max_wait = 200
+      subscribed_max_wait = 10
+      subscribed_wait_count = 0
+
+      spawn {
+        while !client.subscribed?(topic)
+          sleep subscribed_max_wait.milliseconds
+          subscribed_wait_count += 1
         end
+        publish_count.times {
+          sleep (rand(publish_max_wait) + 50).milliseconds
+          client.publish(topic, payload)
+        }
       }
-    end
 
-    ready.receive
-    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "127.0.0.1")
-
-    topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
-
-    publish_count = 7
-    publish_max_wait = 200
-    subscribed_max_wait = 10
-    subscribed_wait_count = 0
-
-    spawn {
-      while !client.subscribed?
-        sleep subscribed_max_wait.milliseconds
-        subscribed_wait_count += 1
-      end
-      publish_count.times {
-        sleep (rand(publish_max_wait) + 50).milliseconds
-        client.publish(topic, payload)
-      }
-    }
-
-    spawn {
-      sleep (subscribed_max_wait * subscribed_wait_count +
-             publish_max_wait * publish_count * 7 + 2000).milliseconds
-      client.close
-      done.send true
-      config.delete
-      fail "waited too long"
-    }
-
-    get_count = 0
-
-    client.get(topic) { |t, m|
-      t.should eq topic
-      m.should eq payload
-      if (get_count += 1) == publish_count
+      spawn {
+        sleep (subscribed_max_wait * subscribed_wait_count +
+               publish_max_wait * publish_count * 7 + 2000).milliseconds
         client.close
-        client.connected?.should eq false
-      end
-    }
+        fail "waited too long"
+      }
 
-    done.send true
-    config.delete
+      get_count = 0
+      client.subscribe(topic)
+      while get_count < publish_count
+        t, m = client.receive
+        t.should eq topic
+        m.should eq payload
+        get_count += 1
+      end
+      client.close
+      client.connected?.should eq false
+    end
   end
 
   it "publishes with retain" do
-    config = File.tempfile("mosquitto.conf")
-    config << "port 1883"
-    config << "allow_anonymous true"
+    with_mosquitto do
+      client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "127.0.0.1")
 
-    ready = Channel(Bool).new
-    done = Channel(Bool).new
-    spawn do
-      Process.run("mosquitto", ["-c", config.path], input: Process::Redirect::Close) { |p|
-        loop {
-          break if p.error.read_line.includes? "on port 1883"
-        }
-        ready.send true
-        # Cleanup mosquitto after test finishes
-        done.receive
-        begin
-          p.kill
-        rescue
-        end
-      }
-    end
+      topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
 
-    ready.receive
-    client = MqttCrystal::Client.new(id: "CR-#{UUID.random.to_s}", host: "127.0.0.1")
+      client.publish topic, payload, retain: true
 
-    topic, payload = "pub/#{client.id}/test", (999 + rand(999)).times.map { rand(36).to_s(36) }.join
+      client.subscribe(topic)
 
-    publish_count = 7
-    publish_max_wait = 200
-    subscribed_max_wait = 10
-    subscribed_wait_count = 0
-
-    client.publish topic, payload, retain: true
-
-    spawn {
-      sleep 15.seconds
-      client.close
-      done.send true
-      config.delete
-      fail "waited too long"
-    }
-
-    client.get(topic) { |t, m|
+      t, m = client.receive
       t.should eq topic
       m.should eq payload
+
       client.close
       client.connected?.should eq false
-    }
-
-    done.send true
-    config.delete
+    end
   end
 
   it "mqtt connect url" do
