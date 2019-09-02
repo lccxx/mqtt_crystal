@@ -458,22 +458,23 @@ class MqttCrystal::Packet
     include PacketWithNoPayload
   end
 
-  PACKET_TYPES = [nil,
-                  Packet::Connect,
-                  Packet::Connack,
-                  Packet::Publish,
-                  Packet::Puback,
-                  Packet::Pubrec,
-                  Packet::Pubrel,
-                  Packet::Pubcomp,
-                  Packet::Subscribe,
-                  Packet::Suback,
-                  Packet::Unsubscribe,
-                  Packet::Unsuback,
-                  Packet::Pingreq,
-                  Packet::Pingresp,
-                  Packet::Disconnect,
-                  nil,
+  PACKET_TYPES = [
+    nil,
+    Packet::Connect,
+    Packet::Connack,
+    Packet::Publish,
+    Packet::Puback,
+    Packet::Pubrec,
+    Packet::Pubrel,
+    Packet::Pubcomp,
+    Packet::Subscribe,
+    Packet::Suback,
+    Packet::Unsubscribe,
+    Packet::Unsuback,
+    Packet::Pingreq,
+    Packet::Pingresp,
+    Packet::Disconnect,
+    nil,
   ]
 
   enum ConnackResponse : UInt8
