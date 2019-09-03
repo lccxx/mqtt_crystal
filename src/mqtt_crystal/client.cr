@@ -152,7 +152,10 @@ class MqttCrystal::Client
   end
 
   private def reconnect : self
-    return self if !@auto_reconnect
+    unless @auto_reconnect
+      close
+      return self
+    end
     @connecting = @connected = false
     @subscribed.clear
     begin
