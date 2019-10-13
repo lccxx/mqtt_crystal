@@ -85,7 +85,7 @@ class MqttCrystal::Packet
   def encode_short(n : UInt16) : Bytes
     slice = Bytes.new(2)
     slice[0] = (n >> 8).to_u8
-    slice[1] = n.to_u8
+    slice[1] = (n & 255).to_u8
     slice
   end
 
@@ -145,7 +145,7 @@ class MqttCrystal::Packet
       digit = body_length % 128
       body_length = body_length // 128
       digit |= 0x80 if body_length > 0
-      header.push(digit.to_u8)
+      header.push((digit & 255).to_u8)
       break if body_length <= 0
     end
 
@@ -177,7 +177,7 @@ class MqttCrystal::Packet
       slice[0] = encode_header
       slice[1] = 2_u8
       slice[2] = (@id >> 8).to_u8
-      slice[3] = @id.to_u8
+      slice[3] = (@id & 255).to_u8
       slice
     end
 
