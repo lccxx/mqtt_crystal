@@ -143,7 +143,7 @@ class MqttCrystal::Packet
 
     while true
       digit = body_length % 128
-      body_length = body_length / 128
+      body_length = body_length // 128
       digit |= 0x80 if body_length > 0
       header.push(digit.to_u8)
       break if body_length <= 0
