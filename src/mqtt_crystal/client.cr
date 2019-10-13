@@ -83,7 +83,7 @@ class MqttCrystal::Client
         end
       end
     rescue spawn_read_e
-      pp spawn_read_e
+      pp spawn_read_e unless @stop
       reconnect
     end
 
